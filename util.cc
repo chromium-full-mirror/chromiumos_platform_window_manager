@@ -179,6 +179,11 @@ void RunCommandInBackground(string command) {
     LOG(WARNING) << "Got error while running \"" << command << "\"";
 }
 
+void ToggleBool(bool* value) {
+  DCHECK(value);
+  *value = !(*value);
+}
+
 }  // namespace util
 
 }  // namespace window_manager

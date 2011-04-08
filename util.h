@@ -291,6 +291,9 @@ std::string GetHostname();
 // using from protobuf has trouble with references.
 void RunCommandInBackground(std::string command);
 
+// Toggle the state of |value|.
+void ToggleBool(bool* value);
+
 }  // namespace util
 
 }  // namespace window_manager

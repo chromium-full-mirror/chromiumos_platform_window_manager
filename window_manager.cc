@@ -34,7 +34,7 @@ extern "C" {
 #include "window_manager/image_container.h"
 #include "window_manager/image_enums.h"
 #include "window_manager/key_bindings.h"
-#include "window_manager/layout/layout_manager.h"
+#include "window_manager/layout2/layout_manager2.h"
 #include "window_manager/login/login_controller.h"
 #include "window_manager/modality_handler.h"
 #include "window_manager/panels/panel_manager.h"
@@ -518,7 +518,7 @@ void WindowManager::SetLoggedInState(bool logged_in, bool initial) {
     HandlePanelManagerAreaChange();
 
     DCHECK(!layout_manager_.get());
-    layout_manager_.reset(new LayoutManager(this, panel_manager_.get()));
+    layout_manager_.reset(new LayoutManager2(this));
     event_consumers_.insert(layout_manager_.get());
 
     // We've probably already dropped the background containing the initial
@@ -926,7 +926,7 @@ int WindowManager::GetNumWindows() const {
   if (panel_manager_.get())
     num_windows += panel_manager_->num_panels();
   if (layout_manager_.get())
-    num_windows += layout_manager_->num_toplevels();
+    num_windows += layout_manager_->num_browser_windows();
   return num_windows;
 }
 

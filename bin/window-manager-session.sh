@@ -21,12 +21,12 @@ LOGGED_OUT_SCREENSHOT_DIR="/tmp"
 XTERM_COMMAND="/usr/bin/cros-term"
 
 exec "${WM}"                                                            \
-  --background_image="${IMAGES}/background_1024x600.png"                \
   --initial_chrome_window_mapped_file="${INITIAL_CHROME_FILE}"          \
   --logged_in_log_dir="${LOGGED_IN_LOG_DIR}"                            \
   --logged_in_screenshot_output_dir="${LOGGED_IN_SCREENSHOT_DIR}"       \
   --logged_out_log_dir="${LOGGED_OUT_LOG_DIR}"                          \
   --logged_out_screenshot_output_dir="${LOGGED_OUT_SCREENSHOT_DIR}"     \
+  --multiple_windows=false                                              \
   --panel_anchor_image="${IMAGES}/panel_anchor.png"                     \
   --panel_dock_background_image="${IMAGES}/panel_dock_bg.png"           \
   --panel_content_shadow_image_dir="${IMAGES}/panel_content_shadow"     \
@@ -36,7 +36,6 @@ exec "${WM}"                                                            \
   --rectangular_shadow_image_dir="${IMAGES}/rectangular_shadow"         \
   --report_metrics                                                      \
   --resize_box_image_dir="${IMAGES}/resize_box"                         \
-  --separator_image="${IMAGES}/separator.png"                           \
   --unaccelerated_graphics_image="${IMAGES}/unaccelerated_graphics.png" \
   --unredirect_fullscreen_window=true                                   \
   --xterm_command="${XTERM_COMMAND}"

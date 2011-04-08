@@ -96,6 +96,7 @@ class Window {
   bool override_redirect() const { return override_redirect_; }
   chromeos::WmIpcWindowType type() const { return type_; }
   const std::vector<int>& type_params() const { return type_params_; }
+  Visibility visibility() const { return visibility_; }
   const char* type_str() const {
     return chromeos::WmIpcWindowTypeToString(type_);
   }
@@ -144,7 +145,12 @@ class Window {
   const std::vector<XAtom>& wm_window_type_xatoms() const {
     return wm_window_type_xatoms_;
   }
+  const std::set<XAtom>& chrome_state_xatoms() const {
+    return chrome_state_xatoms_;
+  }
   bool wm_state_fullscreen() const { return wm_state_fullscreen_; }
+  bool wm_state_maximized_horz() const { return wm_state_maximized_horz_; }
+  bool wm_state_maximized_vert() const { return wm_state_maximized_vert_; }
   bool wm_state_modal() const { return wm_state_modal_; }
   bool wm_hint_urgent() const { return wm_hint_urgent_; }
   const std::string& client_hostname() const { return client_hostname_; }
@@ -377,7 +383,7 @@ class Window {
   // caller, who should pass it back via SetMoveCompositedAnimation() after
   // adding additional keyframes.
   //
-  // Windows with shadows cannot currently be animated (this is DCHECK()-ed).
+  // Note that the window's shadow isn't currently animated.
   AnimationPair* CreateMoveCompositedAnimation();
 
   // Use a pair of animations previously allocated with

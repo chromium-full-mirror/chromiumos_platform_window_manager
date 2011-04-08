@@ -904,7 +904,6 @@ void Window::ScaleComposited(double scale_x, double scale_y, int anim_ms) {
 
 AnimationPair* Window::CreateMoveCompositedAnimation() {
   DCHECK(actor_.get());
-  DCHECK(!shadow_.get());
   return actor_->CreateMoveAnimation();
 }
 
@@ -923,6 +922,8 @@ void Window::SetMoveCompositedAnimation(AnimationPair* animations) {
   if (visibility_ != VISIBILITY_UNSET)
     UpdateClientWindowPosition();
 
+  if (shadow_.get())
+    shadow_->Move(composited_x(), composited_y(), 0);
   if (damage_debug_group_.get())
     damage_debug_group_->Move(composited_x(), composited_y(), 0);
 }

@@ -29,7 +29,7 @@ class StackingManager {
   // Layers above LAYER_TOP_CLIENT_WINDOW don't have X windows, since we want
   // them to always appear above client windows.
   enum Layer {
-    // Debugging objects that should be positioned above everything else.
+    // Debugging objects that should be stacked above everything else.
     LAYER_DEBUGGING = 0,
 
     // Snapshots of the screen animated while locking or shutting down.
@@ -45,8 +45,8 @@ class StackingManager {
     // Chrome screen locker window.
     LAYER_SCREEN_LOCKER,
 
-    // A fullscreen window (maybe a regular Chrome window; maybe a panel
-    // content window).
+    // A fullscreen window (maybe a browser window; maybe a panel content
+    // window).
     LAYER_FULLSCREEN_WINDOW,
 
     // A panel as it's being dragged.  This is a separate layer so that the
@@ -77,11 +77,11 @@ class StackingManager {
     // backgrounds).
     LAYER_PANEL_DOCK,
 
-    // Toplevel windows, along with their transient windows.
-    LAYER_TOPLEVEL_WINDOW,
+    // The currently active (i.e. stacked-on-top) browser window.
+    LAYER_ACTIVE_BROWSER_WINDOW,
 
-    // Snapshot windows, along with their input windows.
-    LAYER_SNAPSHOT_WINDOW,
+    // An inactive browser window.
+    LAYER_INACTIVE_BROWSER_WINDOW,
 
     // "Other" non-login windows (e.g. transient dialogs) managed by
     // LoginController.

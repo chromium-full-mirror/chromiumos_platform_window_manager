@@ -47,7 +47,7 @@ class FocusManager;
 class KeyBindings;
 class KeyBindingsActionRegistrar;
 class KeyBindingsGroup;
-class LayoutManager;
+class LayoutManager2;
 class LoginController;
 class ModalityHandler;
 class ScreenLockerHandler;
@@ -301,7 +301,7 @@ class WindowManager : public PanelManagerAreaChangeListener,
 
  private:
   friend class BasicWindowManagerTest;
-  friend class LayoutManagerTest;         // uses |layout_manager_|
+  friend class LayoutManager2Test;        // uses |layout_manager_|
   friend class LoginControllerTest;       // uses |login_controller_|
   friend class ModalityHandlerTest;       // uses |modality_handler_|
   friend class PanelTest;                 // uses |panel_manager_|
@@ -310,11 +310,6 @@ class WindowManager : public PanelManagerAreaChangeListener,
   friend class PanelManagerTest;          // uses |panel_manager_|
   friend class ScreenLockerHandlerTest;   // uses |screen_locker_handler_|
   FRIEND_TEST(ChromeWatchdogTest, Basic);
-  FRIEND_TEST(LayoutManagerTest, Basic);  // uses TrackWindow()
-  FRIEND_TEST(LayoutManagerTest, OverviewSpacing);
-  FRIEND_TEST(LayoutManagerTest, InitialWindowStacking);
-  FRIEND_TEST(LayoutManagerTest, KeyBindings);
-  FRIEND_TEST(LayoutManagerTest, ChangeBackgroundsAfterInitialWindow);
   FRIEND_TEST(PanelBarTest, ModalDimming);
   FRIEND_TEST(WindowTest, TransientFor);  // uses TrackWindow()
   FRIEND_TEST(WindowManagerTest, RegisterExistence);
@@ -526,7 +521,7 @@ class WindowManager : public PanelManagerAreaChangeListener,
   // override-redirect) windows from this list.
   scoped_ptr<Stacker<XWindow> > stacked_xids_;
 
-  // Things that consume events (e.g. LayoutManager, PanelManager, etc.).
+  // Things that consume events (e.g. LayoutManager2, PanelManager, etc.).
   std::set<EventConsumer*> event_consumers_;
 
   // Map from windows to event consumers that will be notified if events
@@ -561,7 +556,7 @@ class WindowManager : public PanelManagerAreaChangeListener,
 
   // These aren't initialized until the user has logged in.
   scoped_ptr<PanelManager> panel_manager_;
-  scoped_ptr<LayoutManager> layout_manager_;
+  scoped_ptr<LayoutManager2> layout_manager_;
 
   // Initialized at startup if the user isn't already logged in, and
   // deletes itself via DestroyLoginController() when the user is logged in

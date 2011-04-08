@@ -39,7 +39,7 @@ TEST_F(StackingManagerTest, StackXidAtTopOfLayer) {
   // Tell the stacking manager to stack them in different layers and then
   // make sure that they were restacked correctly.
   stacking_manager_->StackXidAtTopOfLayer(
-      xid, StackingManager::LAYER_TOPLEVEL_WINDOW);
+      xid, StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
   stacking_manager_->StackXidAtTopOfLayer(
       xid2, StackingManager::LAYER_PACKED_PANEL_IN_BAR);
   EXPECT_LT(xconn_->stacked_xids().GetIndex(xid2),
@@ -64,13 +64,13 @@ TEST_F(StackingManagerTest, StackActorAtTopOfLayer) {
   stacking_manager_->StackActorAtTopOfLayer(
       actor.get(), StackingManager::LAYER_BACKGROUND);
   stacking_manager_->StackActorAtTopOfLayer(
-      actor2.get(), StackingManager::LAYER_TOPLEVEL_WINDOW);
+      actor2.get(), StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
   EXPECT_LT(stage->GetStackingIndex(actor2.get()),
             stage->GetStackingIndex(actor.get()));
 
   // Now restack them.
   stacking_manager_->StackActorAtTopOfLayer(
-      actor.get(), StackingManager::LAYER_TOPLEVEL_WINDOW);
+      actor.get(), StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
   EXPECT_LT(stage->GetStackingIndex(actor.get()),
             stage->GetStackingIndex(actor2.get()));
 }
@@ -92,11 +92,11 @@ TEST_F(StackingManagerTest, StackWindowAtTopOfLayer) {
   // relative positions are correct.
   stacking_manager_->StackWindowAtTopOfLayer(
       &win,
-      StackingManager::LAYER_TOPLEVEL_WINDOW,
+      StackingManager::LAYER_ACTIVE_BROWSER_WINDOW,
       StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
   stacking_manager_->StackWindowAtTopOfLayer(
       &win2,
-      StackingManager::LAYER_TOPLEVEL_WINDOW,
+      StackingManager::LAYER_ACTIVE_BROWSER_WINDOW,
       StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
   EXPECT_LT(xconn_->stacked_xids().GetIndex(xid2),
             xconn_->stacked_xids().GetIndex(xid));
@@ -162,7 +162,7 @@ TEST_F(StackingManagerTest, StackWindowRelativeToOtherWindow) {
   MockCompositor::StageActor* stage = compositor_->GetDefaultStage();
   stacking_manager_->StackWindowAtTopOfLayer(
       &win,
-      StackingManager::LAYER_TOPLEVEL_WINDOW,
+      StackingManager::LAYER_ACTIVE_BROWSER_WINDOW,
       StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
 
   // Stack the second window above the first with its shadow at the bottom of
@@ -172,7 +172,7 @@ TEST_F(StackingManagerTest, StackWindowRelativeToOtherWindow) {
       &win,
       StackingManager::ABOVE_SIBLING,
       StackingManager::SHADOW_AT_BOTTOM_OF_LAYER,
-      StackingManager::LAYER_TOPLEVEL_WINDOW);
+      StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
   EXPECT_LT(stage->GetStackingIndex(win2.actor()),
             stage->GetStackingIndex(win.actor()));
   EXPECT_LT(stage->GetStackingIndex(win.actor()),
@@ -187,7 +187,7 @@ TEST_F(StackingManagerTest, StackWindowRelativeToOtherWindow) {
       &win,
       StackingManager::BELOW_SIBLING,
       StackingManager::SHADOW_AT_BOTTOM_OF_LAYER,
-      StackingManager::LAYER_TOPLEVEL_WINDOW);
+      StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
   EXPECT_LT(stage->GetStackingIndex(win.actor()),
             stage->GetStackingIndex(win2.actor()));
   EXPECT_LT(stage->GetStackingIndex(win2.actor()),
@@ -201,7 +201,7 @@ TEST_F(StackingManagerTest, StackWindowRelativeToOtherWindow) {
       &win,
       StackingManager::ABOVE_SIBLING,
       StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
-      StackingManager::LAYER_TOPLEVEL_WINDOW);
+      StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
   EXPECT_LT(stage->GetStackingIndex(win2.actor()),
             stage->GetStackingIndex(win2.shadow()->group()));
   EXPECT_LT(stage->GetStackingIndex(win2.shadow()->group()),

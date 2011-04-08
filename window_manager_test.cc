@@ -23,7 +23,6 @@
 #include "window_manager/event_consumer.h"
 #include "window_manager/event_loop.h"
 #include "window_manager/geometry.h"
-#include "window_manager/layout/layout_manager.h"
 #include "window_manager/panels/panel.h"
 #include "window_manager/panels/panel_bar.h"
 #include "window_manager/panels/panel_manager.h"
@@ -296,7 +295,7 @@ TEST_F(WindowManagerTest, EventConsumer) {
   wm_->UnregisterEventConsumerForWindowEvents(xid, &ec);
 
   // We don't know whether we'll get the MapRequest event for this window;
-  // the LayoutManager might've handled it before us.
+  // the layout manager might've handled it before us.
   EXPECT_EQ(1, ec.num_mapped_windows());
   EXPECT_EQ(1, ec.num_button_presses());
   EXPECT_EQ(1, ec.num_unmapped_windows());
@@ -355,7 +354,7 @@ TEST_F(WindowManagerTest, EventConsumer) {
   wm_->HandleEvent(&event);
   EXPECT_EQ(1, ec.num_mapped_windows());
 
-  // Create a window that'll get mapped by LayoutManager.  Send two
+  // Create a window that'll get mapped by LayoutManager2.  Send two
   // MapRequests for it (see http://crosbug.com/4176), and check that our
   // event consumer only gets notified about the first one.
   ec.reset_stats();
@@ -607,11 +606,6 @@ TEST_F(WindowManagerTest, ResizeScreen) {
   EXPECT_EQ(new_height, wm_->height());
   EXPECT_EQ(new_width, wm_->stage()->GetWidth());
   EXPECT_EQ(new_height, wm_->stage()->GetHeight());
-
-  EXPECT_EQ(0, wm_->layout_manager_->x());
-  EXPECT_EQ(0, wm_->layout_manager_->y());
-  EXPECT_EQ(new_width, wm_->layout_manager_->width());
-  EXPECT_EQ(new_height, wm_->layout_manager_->height());
 
   // EWMH properties on the root window should be updated as well.
   EXPECT_TRUE(
@@ -1213,11 +1207,10 @@ TEST_F(WindowManagerTest, VideoTimeProperty) {
                                      atom, &video_time));
   EXPECT_EQ(start_time - 5, video_time);
 
-  // Create a second window, which should move the first window offscreen.
-  // Check that we no longer update the property in response to damage
-  // events for the offscreen window.
-  XWindow xid2 = CreateSimpleWindow();
-  SendInitialEventsForWindow(xid2);
+  // Move the window offscreen and check that we no longer update the property
+  // in response to damage events for it.
+  Window* win = wm_->GetWindowOrDie(xid);
+  win->Move(Point(wm_->width(), wm_->height()), 0);
   ASSERT_TRUE(WindowIsOffscreen(xid));
   SetMonotonicTimeForTest(
       GetMonotonicTime() +

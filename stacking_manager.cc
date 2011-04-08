@@ -177,8 +177,8 @@ const char* StackingManager::LayerToName(Layer layer) {
     case LAYER_FLOATING_PANEL_IN_BAR:    return "floating panel in bar";
     case LAYER_PACKED_PANEL_IN_DOCK:     return "packed panel in dock";
     case LAYER_PANEL_DOCK:               return "panel dock";
-    case LAYER_TOPLEVEL_WINDOW:          return "toplevel window";
-    case LAYER_SNAPSHOT_WINDOW:          return "snapshot window";
+    case LAYER_ACTIVE_BROWSER_WINDOW:    return "active browser window";
+    case LAYER_INACTIVE_BROWSER_WINDOW:  return "inactive browser window";
     case LAYER_LOGIN_OTHER_WINDOW:       return "login other window";
     case LAYER_LOGIN_WINDOW:             return "login window";
     case LAYER_BACKGROUND:               return "background";

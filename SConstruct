@@ -100,10 +100,8 @@ srcs = Split('''\
   image_container.cc
   image_grid.cc
   key_bindings.cc
-  layout/layout_manager.cc
-  layout/separator.cc
-  layout/snapshot_window.cc
-  layout/toplevel_window.cc
+  layout2/browser_window.cc
+  layout2/layout_manager2.cc
   login/login_controller.cc
   login/login_entry.cc
   modality_handler.cc

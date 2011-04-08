@@ -1,4 +1,4 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -7,7 +7,7 @@
 #include "window_manager/event_consumer.h"
 #include "window_manager/event_loop.h"
 #include "window_manager/key_bindings.h"
-#include "window_manager/layout/layout_manager.h"
+#include "window_manager/layout2/layout_manager2.h"
 #include "window_manager/motion_event_coalescer.h"
 #include "window_manager/panels/panel.h"
 #include "window_manager/panels/panel_container.h"
