@@ -628,6 +628,17 @@ RealCompositor::TexturePixmapActor::~TexturePixmapActor() {
   pixmap_ = 0;
 }
 
+RealCompositor::Actor* RealCompositor::TexturePixmapActor::Clone() {
+  TexturePixmapActor* new_instance = new TexturePixmapActor(compositor());
+  QuadActor::CloneImpl(new_instance);
+  // TODO(derat): If the underlying pixmap changes, all of the actors that are
+  // tracking it need to be updated, marked dirty (including partial dirtiness),
+  // etc.  This requires a decent amount of refactoring and it's not clear that
+  // we'll need to clone TexturePixmapActors in the long term, so I'm punting on
+  // it for now.
+  return new_instance;
+}
+
 void RealCompositor::TexturePixmapActor::SetPixmap(XID pixmap) {
   set_texture_data(NULL);
   pixmap_ = pixmap;

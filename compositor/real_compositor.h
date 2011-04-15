@@ -484,11 +484,7 @@ class RealCompositor : public Compositor {
     virtual std::string GetDebugString(int indent_level) {
       return GetDebugStringInternal("TexturePixmapActor", indent_level);
     }
-    virtual Actor* Clone() {
-      NOTIMPLEMENTED();
-      CHECK(false);
-      return NULL;
-    }
+    virtual Actor* Clone();
     // End Compositor::Actor methods.
 
     // Implement VisitorDestination for visitor.
