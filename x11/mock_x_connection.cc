@@ -450,13 +450,11 @@ bool MockXConnection::SetWindowBoundingRegionToRect(XWindow xid,
   return true;
 }
 
-bool MockXConnection::RemoveWindowBoundingRegion(XWindow xid) {
+bool MockXConnection::ResetWindowBoundingRegionToDefault(XWindow xid) {
   WindowInfo* info = GetWindowInfo(xid);
   if (!info)
     return false;
-  if (info->shape.get() == NULL)
-    info->shape.reset(new ByteMap(info->bounds.width, info->bounds.height));
-  info->shape->Clear(0);
+  info->shape.reset();
   return true;
 }
 
