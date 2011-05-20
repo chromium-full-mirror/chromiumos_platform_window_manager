@@ -219,6 +219,11 @@ class BasicWindowManagerTest : public ::testing::Test {
   // between the passed-in layer and the layer underneath it?
   bool WindowIsInLayer(Window* win, StackingManager::Layer layer);
 
+  // Test that |win| is stacked above |other_win| (both in terms of its X and
+  // composited windows).  We also return true if this is the case and false
+  // otherwise.
+  bool TestWindowIsAboveOtherWindow(Window* win, Window* other_win);
+
   // Is the passed-in client window entirely offscreen?
   bool WindowIsOffscreen(XWindow xid);
 
@@ -226,6 +231,9 @@ class BasicWindowManagerTest : public ::testing::Test {
   // expected values.  |num_values| is the number of expected values passed
   // as varargs.  Returns true if the expected and actual values match.
   bool TestIntArrayProperty(XWindow xid, XAtom atom, int num_values, ...);
+
+  // Does the property |atom| on |xid| contain |value|?
+  bool IntArrayPropertyContains(XWindow xid, XAtom atom, int value);
 
   // Decode the message from |event| into |msg|.  Returns false on failure.
   bool DecodeWmIpcMessage(const XClientMessageEvent& event,

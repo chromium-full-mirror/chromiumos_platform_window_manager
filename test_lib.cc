@@ -532,6 +532,24 @@ bool BasicWindowManagerTest::WindowIsInLayer(Window* win,
   return true;
 }
 
+bool BasicWindowManagerTest::TestWindowIsAboveOtherWindow(Window* win,
+                                                          Window* other_win) {
+  CHECK(win);
+  CHECK(other_win);
+
+  EXPECT_LT(xconn_->stacked_xids().GetIndex(win->xid()),
+            xconn_->stacked_xids().GetIndex(other_win->xid()));
+
+  MockCompositor::StageActor* stage = compositor_->GetDefaultStage();
+  EXPECT_LT(stage->GetStackingIndex(win->actor()),
+            stage->GetStackingIndex(other_win->actor()));
+
+  return xconn_->stacked_xids().GetIndex(win->xid()) <
+         xconn_->stacked_xids().GetIndex(other_win->xid()) &&
+         stage->GetStackingIndex(win->actor()) <
+         stage->GetStackingIndex(other_win->actor());
+}
+
 bool BasicWindowManagerTest::WindowIsOffscreen(XWindow xid) {
   const MockXConnection::WindowInfo* info = xconn_->GetWindowInfoOrDie(xid);
   const MockXConnection::WindowInfo* root_info =
@@ -579,6 +597,14 @@ bool BasicWindowManagerTest::TestIntArrayProperty(
   }
 
   return success;
+}
+
+bool BasicWindowManagerTest::IntArrayPropertyContains(
+    XWindow xid, XAtom atom, int value) {
+  vector<int> values;
+  if (!xconn_->GetIntArrayProperty(xid, atom, &values))
+    return false;
+  return find(values.begin(), values.end(), value) != values.end();
 }
 
 bool BasicWindowManagerTest::DecodeWmIpcMessage(
