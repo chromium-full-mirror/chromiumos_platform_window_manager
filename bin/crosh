@@ -100,6 +100,9 @@ HELP='
  tracepath [-n] <destination>[/port]
   Trace the path/route to a network host.
 
+ tpfwupdate 
+  update the trackpad firmware
+
  wpa_debug [<debug_level>] [--help] [--list_valid_level] [--reset]
   Set wpa_supplicant debugging level.
 '
@@ -528,6 +531,15 @@ cmd_tracepath() {
   fi
 
   /usr/sbin/tracepath $option "$1"
+}
+
+cmd_tpfwupdate() {
+  local option=""
+
+  if [ -x /opt/Synaptics/bin/synupdate.sh ]; then
+      sudo /opt/Synaptics/bin/synupdate.sh 
+  fi
+
 }
 
 cmd_top() {
