@@ -282,11 +282,12 @@ TEST_F(PanelManagerTest, Fullscreen) {
   // whole screen, and stacked above the other panels.
   EXPECT_TRUE(panel2->is_fullscreen());
   EXPECT_EQ(panel2->content_xid(), xconn_->focused_xid());
-  TestPanelContentBounds(panel2, 0, 0, wm_->width(), wm_->height());
+  EXPECT_EQ(wm_->root_bounds(), panel2->content_win()->client_bounds());
+  EXPECT_EQ(wm_->root_bounds(), panel2->content_win()->actor()->GetBounds());
   EXPECT_TRUE(WindowIsInLayer(panel2->content_win(),
                               StackingManager::LAYER_FULLSCREEN_WINDOW));
-  TestIntArrayProperty(
-      panel2->content_xid(), wm_state_atom, 1, fullscreen_atom);
+  EXPECT_TRUE(TestIntArrayProperty(
+      panel2->content_xid(), wm_state_atom, 1, fullscreen_atom));
 
   // Now send a message making the third (leftmost) panel fullscreen.  The
   // second panel should be made non-fullscreen.
@@ -297,20 +298,22 @@ TEST_F(PanelManagerTest, Fullscreen) {
 
   EXPECT_TRUE(panel3->is_fullscreen());
   EXPECT_EQ(panel3->content_xid(), xconn_->focused_xid());
-  TestPanelContentBounds(panel3, 0, 0, wm_->width(), wm_->height());
+  EXPECT_EQ(wm_->root_bounds(), panel3->content_win()->client_bounds());
+  EXPECT_EQ(wm_->root_bounds(), panel3->content_win()->actor()->GetBounds());
   EXPECT_TRUE(WindowIsInLayer(panel3->content_win(),
                               StackingManager::LAYER_FULLSCREEN_WINDOW));
-  TestIntArrayProperty(
-      panel3->content_xid(), wm_state_atom, 1, fullscreen_atom);
+  EXPECT_TRUE(TestIntArrayProperty(
+      panel3->content_xid(), wm_state_atom, 1, fullscreen_atom));
 
   EXPECT_FALSE(panel2->is_fullscreen());
-  TestPanelContentBounds(panel2,
-                         middle_panel_right - content_width,  // x
-                         wm_->height() - content_height,      // y
-                         content_width, content_height);
+  Rect expected_bounds(middle_panel_right - content_width,
+                       wm_->height() - content_height,
+                       content_width, content_height);
+  EXPECT_EQ(expected_bounds, panel2->content_win()->client_bounds());
+  EXPECT_EQ(expected_bounds, panel2->content_win()->actor()->GetBounds());
   EXPECT_TRUE(WindowIsInLayer(panel2->content_win(),
                               StackingManager::LAYER_PACKED_PANEL_IN_BAR));
-  TestIntArrayProperty(panel2->content_xid(), wm_state_atom, 0);
+  EXPECT_TRUE(TestIntArrayProperty(panel2->content_xid(), wm_state_atom, 0));
 
   // Unmap the first (rightmost) panel.  The third panel's content window
   // should still be fullscreened, but its stored position should be
@@ -320,7 +323,8 @@ TEST_F(PanelManagerTest, Fullscreen) {
   xconn_->InitUnmapEvent(&event, panel1->content_xid());
   wm_->HandleEvent(&event);
   EXPECT_TRUE(panel3->is_fullscreen());
-  TestPanelContentBounds(panel3, 0, 0, wm_->width(), wm_->height());
+  EXPECT_EQ(wm_->root_bounds(), panel3->content_win()->client_bounds());
+  EXPECT_EQ(wm_->root_bounds(), panel3->content_win()->actor()->GetBounds());
   EXPECT_TRUE(WindowIsInLayer(panel3->content_win(),
                               StackingManager::LAYER_FULLSCREEN_WINDOW));
   EXPECT_EQ(rightmost_panel_right, panel2->right());
@@ -334,13 +338,14 @@ TEST_F(PanelManagerTest, Fullscreen) {
   SendConfigureNotifyEvent(panel3->content_xid());
   EXPECT_FALSE(panel3->is_fullscreen());
   EXPECT_EQ(panel3->content_xid(), xconn_->focused_xid());
-  TestPanelContentBounds(panel3,
-                         middle_panel_right - content_width,  // x
-                         wm_->height() - content_height,      // y
-                         content_width, content_height);
+  expected_bounds.reset(middle_panel_right - content_width,
+                        wm_->height() - content_height,
+                        content_width, content_height);
+  EXPECT_EQ(expected_bounds, panel3->content_win()->client_bounds());
+  EXPECT_EQ(expected_bounds, panel3->content_win()->actor()->GetBounds());
   EXPECT_TRUE(WindowIsInLayer(panel3->content_win(),
                               StackingManager::LAYER_PACKED_PANEL_IN_BAR));
-  TestIntArrayProperty(panel3->content_xid(), wm_state_atom, 0);
+  EXPECT_TRUE(TestIntArrayProperty(panel3->content_xid(), wm_state_atom, 0));
 
   // Fullscreen the second panel and then unmap one of its windows.  Check
   // that the panel manager's fullscreen panel pointer is cleared.

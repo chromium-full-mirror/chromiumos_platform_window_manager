@@ -224,15 +224,8 @@ class BasicWindowManagerTest : public ::testing::Test {
 
   // Fetch an int array property on a window and check that it contains the
   // expected values.  |num_values| is the number of expected values passed
-  // as varargs.
-  void TestIntArrayProperty(XWindow xid, XAtom atom, int num_values, ...);
-
-  // Test the bounds of a panel's content window.
-  void TestPanelContentBounds(
-      Panel* panel, int x, int y, int width, int height);
-
-  // Are a panel's client and composited windows at the same spot?
-  bool PanelClientAndCompositedWindowsHaveSamePositions(Panel* panel);
+  // as varargs.  Returns true if the expected and actual values match.
+  bool TestIntArrayProperty(XWindow xid, XAtom atom, int num_values, ...);
 
   // Decode the message from |event| into |msg|.  Returns false on failure.
   bool DecodeWmIpcMessage(const XClientMessageEvent& event,

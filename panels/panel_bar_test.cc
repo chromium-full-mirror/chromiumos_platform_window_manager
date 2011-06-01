@@ -943,7 +943,10 @@ TEST_F(PanelBarTest, FloatingPanels) {
   SendPanelDraggedMessage(panel3, drag_x, drag_y);
   SendPanelDragCompleteMessage(panel3);
   EXPECT_EQ(drag_x, panel3->right());
-  EXPECT_TRUE(PanelClientAndCompositedWindowsHaveSamePositions(panel3));
+  EXPECT_EQ(panel3->content_win()->client_bounds(),
+            panel3->content_win()->actor()->GetBounds());
+  EXPECT_EQ(panel3->titlebar_win()->client_bounds(),
+            panel3->titlebar_win()->actor()->GetBounds());
 
   // Drag panel2 to the left so it overlaps the right edge of panel3, and
   // check that panel3 gets pushed to the left to make room.
@@ -955,8 +958,14 @@ TEST_F(PanelBarTest, FloatingPanels) {
   SendPanelDragCompleteMessage(panel2);
   EXPECT_EQ(drag_x, panel2->right());
   EXPECT_EQ(panel2->content_x() - kSpacing, panel3->right());
-  EXPECT_TRUE(PanelClientAndCompositedWindowsHaveSamePositions(panel2));
-  EXPECT_TRUE(PanelClientAndCompositedWindowsHaveSamePositions(panel3));
+  EXPECT_EQ(panel2->content_win()->client_bounds(),
+            panel2->content_win()->actor()->GetBounds());
+  EXPECT_EQ(panel2->titlebar_win()->client_bounds(),
+            panel2->titlebar_win()->actor()->GetBounds());
+  EXPECT_EQ(panel3->content_win()->client_bounds(),
+            panel3->content_win()->actor()->GetBounds());
+  EXPECT_EQ(panel3->titlebar_win()->client_bounds(),
+            panel3->titlebar_win()->actor()->GetBounds());
 
   // Drag panel2 further to the left, and check that panel3 jumps over to
   // its right (where there should be enough room for it -- panel2 is 1.5

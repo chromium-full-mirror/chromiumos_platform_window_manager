@@ -59,6 +59,8 @@ StackingManager::~StackingManager() {
 void StackingManager::StackWindowAtTopOfLayer(
     Window* win, Layer layer, ShadowPolicy shadow_policy) {
   DCHECK(win);
+  DLOG(INFO) << "Stacking window " << win->xid_str() << " at top of "
+             << LayerToName(layer) << " layer";
 
   DCHECK_GE(layer, LAYER_TOP_CLIENT_WINDOW)
       << "Window " << win->xid_str() << " being stacked above "
@@ -79,6 +81,8 @@ void StackingManager::StackWindowAtTopOfLayer(
 }
 
 void StackingManager::StackXidAtTopOfLayer(XWindow xid, Layer layer) {
+  DLOG(INFO) << "Stacking XID " << XidStr(xid) << " at top of "
+             << LayerToName(layer) << " layer";
   DCHECK_GE(layer, LAYER_TOP_CLIENT_WINDOW)
       << "Window " << XidStr(xid) << " being stacked above "
       << "top-client-window layer";
@@ -101,6 +105,9 @@ void StackingManager::StackWindowRelativeToOtherWindow(
     Layer shadow_layer) {
   DCHECK(win);
   DCHECK(sibling);
+  DLOG(INFO) << "Stacking window " << win->xid_str() << " "
+             << (sibling_policy == ABOVE_SIBLING ? "above" : "below")
+             << " window " << sibling->xid_str();
 
   Compositor::Actor* lower_layer_actor = NULL;
   if (shadow_policy == SHADOW_AT_BOTTOM_OF_LAYER)

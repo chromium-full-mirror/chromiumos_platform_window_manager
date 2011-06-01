@@ -542,8 +542,9 @@ bool BasicWindowManagerTest::WindowIsOffscreen(XWindow xid) {
           info->bounds.y >= root_info->bounds.height);
 }
 
-void BasicWindowManagerTest::TestIntArrayProperty(
+bool BasicWindowManagerTest::TestIntArrayProperty(
     XWindow xid, XAtom atom, int num_values, ...) {
+  bool success = true;
   vector<int> expected;
 
   va_list args;
@@ -559,38 +560,25 @@ void BasicWindowManagerTest::TestIntArrayProperty(
   int exists = xconn_->GetIntArrayProperty(xid, atom, &actual);
   if (expected.empty()) {
     EXPECT_FALSE(exists);
+    if (exists)
+      success = false;
   } else {
     EXPECT_TRUE(exists);
-    ASSERT_EQ(expected.size(), actual.size());
-    for (size_t i = 0; i < actual.size(); ++i)
+    if (!exists)
+      success = false;
+
+    EXPECT_EQ(expected.size(), actual.size());
+    if (expected.size() != actual.size())
+      return false;
+
+    for (size_t i = 0; i < actual.size(); ++i) {
       EXPECT_EQ(expected[i], actual[i]);
+      if (expected[i] != actual[i])
+        success = false;
+    }
   }
-}
 
-void BasicWindowManagerTest::TestPanelContentBounds(
-    Panel* panel, int x, int y, int width, int height) {
-  EXPECT_EQ(x, panel->content_win()->client_x());
-  EXPECT_EQ(y, panel->content_win()->client_y());
-  EXPECT_EQ(width, panel->content_win()->client_width());
-  EXPECT_EQ(height, panel->content_win()->client_height());
-
-  EXPECT_EQ(x, panel->content_win()->actor()->GetX());
-  EXPECT_EQ(y, panel->content_win()->actor()->GetY());
-  EXPECT_EQ(width, panel->content_win()->actor()->GetWidth());
-  EXPECT_EQ(height, panel->content_win()->actor()->GetHeight());
-}
-
-bool BasicWindowManagerTest::PanelClientAndCompositedWindowsHaveSamePositions(
-    Panel* panel) {
-  CHECK(panel);
-  return (panel->content_win()->composited_x() ==
-          panel->content_win()->client_x()) &&
-         (panel->content_win()->composited_y() ==
-          panel->content_win()->client_y()) &&
-         (panel->titlebar_win()->composited_x() ==
-          panel->titlebar_win()->client_x()) &&
-         (panel->titlebar_win()->composited_y() ==
-          panel->titlebar_win()->client_y());
+  return success;
 }
 
 bool BasicWindowManagerTest::DecodeWmIpcMessage(

@@ -579,10 +579,13 @@ TEST_F(WindowManagerTest, ResizeScreen) {
   MockXConnection::WindowInfo* root_info = xconn_->GetWindowInfoOrDie(root_xid);
 
   // Check that they're set correctly.
-  TestIntArrayProperty(root_xid, geometry_atom, 2,
-                       root_info->bounds.width, root_info->bounds.height);
-  TestIntArrayProperty(root_xid, workarea_atom, 4,
-                       0, 0, root_info->bounds.width, root_info->bounds.height);
+  EXPECT_TRUE(
+      TestIntArrayProperty(root_xid, geometry_atom, 2,
+                           root_info->bounds.width, root_info->bounds.height));
+  EXPECT_TRUE(
+      TestIntArrayProperty(
+          root_xid, workarea_atom, 4,
+          0, 0, root_info->bounds.width, root_info->bounds.height));
 
   int new_width = root_info->bounds.width / 2;
   int new_height = root_info->bounds.height / 2;
@@ -611,9 +614,11 @@ TEST_F(WindowManagerTest, ResizeScreen) {
   EXPECT_EQ(new_height, wm_->layout_manager_->height());
 
   // EWMH properties on the root window should be updated as well.
-  TestIntArrayProperty(root_xid, geometry_atom, 2, new_width, new_height);
-  TestIntArrayProperty(root_xid, workarea_atom, 4,
-                       0, 0, new_width, new_height);
+  EXPECT_TRUE(
+      TestIntArrayProperty(root_xid, geometry_atom, 2, new_width, new_height));
+  EXPECT_TRUE(
+      TestIntArrayProperty(root_xid, workarea_atom, 4,
+                           0, 0, new_width, new_height));
 }
 
 // Test that the _NET_WORKAREA property on the root window excludes areas
@@ -625,8 +630,10 @@ TEST_F(WindowManagerTest, SubtractPanelDocksFromNetWorkareaProperty) {
   ASSERT_TRUE(xconn_->GetAtom("_NET_WORKAREA", &workarea_atom));
   XWindow root_xid = xconn_->GetRootWindow();
   MockXConnection::WindowInfo* root_info = xconn_->GetWindowInfoOrDie(root_xid);
-  TestIntArrayProperty(root_xid, workarea_atom, 4,
-                       0, 0, root_info->bounds.width, root_info->bounds.height);
+  EXPECT_TRUE(
+      TestIntArrayProperty(
+          root_xid, workarea_atom, 4,
+          0, 0, root_info->bounds.width, root_info->bounds.height));
 
   // Create a panel and drag it to the left so it's attached to the left
   // dock.  The workarea property should leave room on the left side of the
@@ -634,18 +641,22 @@ TEST_F(WindowManagerTest, SubtractPanelDocksFromNetWorkareaProperty) {
   Panel* panel = CreatePanel(200, 20, 400);
   SendPanelDraggedMessage(panel, 0, 0);
   SendPanelDragCompleteMessage(panel);
-  TestIntArrayProperty(root_xid, workarea_atom, 4,
-                       PanelManager::kPanelDockWidth, 0,
-                       root_info->bounds.width - PanelManager::kPanelDockWidth,
-                       root_info->bounds.height);
+  EXPECT_TRUE(
+      TestIntArrayProperty(
+          root_xid, workarea_atom, 4,
+          PanelManager::kPanelDockWidth, 0,
+          root_info->bounds.width - PanelManager::kPanelDockWidth,
+          root_info->bounds.height));
 
   // Now dock it on the right.
   SendPanelDraggedMessage(panel, root_info->bounds.width - 1, 0);
   SendPanelDragCompleteMessage(panel);
-  TestIntArrayProperty(root_xid, workarea_atom, 4,
-                       0, 0,
-                       root_info->bounds.width - PanelManager::kPanelDockWidth,
-                       root_info->bounds.height);
+  EXPECT_TRUE(
+      TestIntArrayProperty(
+          root_xid, workarea_atom, 4,
+          0, 0,
+          root_info->bounds.width - PanelManager::kPanelDockWidth,
+          root_info->bounds.height));
 
   // After the screen gets resized, the dock should still be taken into
   // account.
@@ -654,10 +665,12 @@ TEST_F(WindowManagerTest, SubtractPanelDocksFromNetWorkareaProperty) {
   XEvent event;
   xconn_->InitConfigureNotifyEvent(&event, root_xid);
   wm_->HandleEvent(&event);
-  TestIntArrayProperty(root_xid, workarea_atom, 4,
-                       0, 0,
-                       root_info->bounds.width - PanelManager::kPanelDockWidth,
-                       root_info->bounds.height);
+  EXPECT_TRUE(
+      TestIntArrayProperty(
+          root_xid, workarea_atom, 4,
+          0, 0,
+          root_info->bounds.width - PanelManager::kPanelDockWidth,
+          root_info->bounds.height));
 }
 
 // Test that the _NET_CLIENT_LIST and _NET_CLIENT_LIST_STACKING properties
@@ -669,16 +682,17 @@ TEST_F(WindowManagerTest, ClientListProperties) {
   ASSERT_TRUE(xconn_->GetAtom("_NET_CLIENT_LIST_STACKING", &stacking_atom));
 
   // Both properties should be unset when there aren't any client windows.
-  TestIntArrayProperty(root_xid, list_atom, 0);
-  TestIntArrayProperty(root_xid, stacking_atom, 0);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 0));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 0));
 
   // Create and map a regular window.
   XWindow xid = CreateSimpleWindow();
   SendInitialEventsForWindow(xid);
+  SendConfigureNotifyEvent(xid);
 
   // Both properties should contain just this window.
-  TestIntArrayProperty(root_xid, list_atom, 1, xid);
-  TestIntArrayProperty(root_xid, stacking_atom, 1, xid);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 1, xid));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 1, xid));
 
   // Create and map an override-redirect window.
   XWindow override_redirect_xid =
@@ -691,52 +705,50 @@ TEST_F(WindowManagerTest, ClientListProperties) {
   SendInitialEventsForWindow(override_redirect_xid);
 
   // The override-redirect window shouldn't be included.
-  TestIntArrayProperty(root_xid, list_atom, 1, xid);
-  TestIntArrayProperty(root_xid, stacking_atom, 1, xid);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 1, xid));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 1, xid));
 
   // Create and map a second regular window.
   XWindow xid2 = CreateSimpleWindow();
   SendInitialEventsForWindow(xid2);
+  SendConfigureNotifyEvent(xid);
+  SendConfigureNotifyEvent(xid2);
 
   // The second window should appear after the first in _NET_CLIENT_LIST,
   // since it was mapped after it, and after the first in
   // _NET_CLIENT_LIST_STACKING, since it's stacked above it (new windows
   // get stacked above their siblings).
-  TestIntArrayProperty(root_xid, list_atom, 2, xid, xid2);
-  TestIntArrayProperty(root_xid, stacking_atom, 2, xid, xid2);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 2, xid, xid2));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 2, xid, xid2));
 
   // Raise the override-redirect window above the others.
   ASSERT_TRUE(xconn_->RaiseWindow(override_redirect_xid));
-  XEvent event;
-  xconn_->InitConfigureNotifyEvent(&event, override_redirect_xid);
-  event.xconfigure.above = xid2;
-  wm_->HandleEvent(&event);
+  SendConfigureNotifyEvent(override_redirect_xid);
 
   // The properties should be unchanged.
-  TestIntArrayProperty(root_xid, list_atom, 2, xid, xid2);
-  TestIntArrayProperty(root_xid, stacking_atom, 2, xid, xid2);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 2, xid, xid2));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 2, xid, xid2));
 
   // Raise the first window on top of the second window.
   ASSERT_TRUE(xconn_->StackWindow(xid, xid2, true));
-  xconn_->InitConfigureNotifyEvent(&event, xid);
-  event.xconfigure.above = xid2;
-  wm_->HandleEvent(&event);
+  SendConfigureNotifyEvent(xid);
 
   // The list property should be unchanged, but the second window should
   // appear first in the stacking property since it's now on the bottom.
-  TestIntArrayProperty(root_xid, list_atom, 2, xid, xid2);
-  TestIntArrayProperty(root_xid, stacking_atom, 2, xid2, xid);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 2, xid, xid2));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 2, xid2, xid));
 
   // Destroy the first window.
   ASSERT_TRUE(xconn_->DestroyWindow(xid));
+  XEvent event;
   xconn_->InitUnmapEvent(&event, xid);
   wm_->HandleEvent(&event);
   xconn_->InitDestroyWindowEvent(&event, xid);
   wm_->HandleEvent(&event);
 
   // Both properties should just contain the second window now.
-  TestIntArrayProperty(root_xid, list_atom, 1, xid2);
-  TestIntArrayProperty(root_xid, stacking_atom, 1, xid2);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 1, xid2));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 1, xid2));
 
   // Tell the window manager that the second window was reparented away.
   XReparentEvent* reparent_event = &(event.xreparent);
@@ -747,8 +759,8 @@ TEST_F(WindowManagerTest, ClientListProperties) {
   wm_->HandleEvent(&event);
 
   // The properties should be unset.
-  TestIntArrayProperty(root_xid, list_atom, 0);
-  TestIntArrayProperty(root_xid, stacking_atom, 0);
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, list_atom, 0));
+  EXPECT_TRUE(TestIntArrayProperty(root_xid, stacking_atom, 0));
 }
 
 TEST_F(WindowManagerTest, WmIpcVersion) {
