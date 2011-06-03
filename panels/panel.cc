@@ -103,8 +103,8 @@ Panel::Panel(PanelManager* panel_manager,
           new EventConsumerRegistrar(wm(), panel_manager)),
       transients_(
           new TransientWindowCollection(
-              content_win_,   // owner_win
-              titlebar_win_,  // win_to_stack_above
+              content_win_,  // owner_win
+              TransientWindowCollection::STACK_IN_LAYER,
               TransientWindowCollection::CENTER_ONSCREEN,
               TransientWindowCollection::KEEP_ONSCREEN_ALWAYS,
               panel_manager)),
@@ -569,7 +569,7 @@ void Panel::HandleDragEnd() {
 
 void Panel::HandleTransientWindowMap(Window* win) {
   DCHECK(win);
-  transients_->AddWindow(win, false);  // stack_directly_above_owner=false
+  transients_->AddWindow(win);
   if (content_win_->IsFocused())
     transients_->TakeFocus(wm()->GetCurrentTimeFromServer());
 }

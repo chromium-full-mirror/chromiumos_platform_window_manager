@@ -68,8 +68,8 @@ LayoutManager::ToplevelWindow::ToplevelWindow(Window* win,
       last_state_(STATE_NEW),
       transients_(
           new TransientWindowCollection(
-              win,   // owner_win
-              NULL,  // win_to_stack_above
+              win,  // owner_win
+              TransientWindowCollection::STACK_IN_LAYER,
               TransientWindowCollection::CENTER_OVER_OWNER,
               TransientWindowCollection::KEEP_ONSCREEN_IF_OWNER_IS_ONSCREEN,
               layout_manager)),
@@ -264,9 +264,11 @@ void LayoutManager::ToplevelWindow::SetFullscreenState(bool fullscreen) {
     win_->MoveCompositedToClient();
   }
 
-  const bool stack_transient_directly_above_win =
-      is_fullscreen_ || state_ == STATE_OVERVIEW_MODE;
-  transients_->ApplyStackingForAllWindows(stack_transient_directly_above_win);
+  transients_->set_stacking_policy(
+      is_fullscreen_ ?
+      TransientWindowCollection::STACK_ABOVE_OWNER :
+      TransientWindowCollection::STACK_IN_LAYER);
+  transients_->ApplyStackingForAllWindows();
 }
 
 void LayoutManager::ToplevelWindow::DoNudgeAnimation(bool move_to_left) {
@@ -372,7 +374,7 @@ void LayoutManager::ToplevelWindow::ConfigureForActiveMode(bool animate) {
       break;
   }
 
-  transients_->ApplyStackingForAllWindows(is_fullscreen_);
+  transients_->ApplyStackingForAllWindows();
 
   // Now set in motion the animations by targeting their destination.
   switch (state_) {
@@ -493,8 +495,7 @@ bool LayoutManager::ToplevelWindow::IsWindowOrTransientFocused() const {
 
 void LayoutManager::ToplevelWindow::HandleTransientWindowMap(
     Window* transient_win, bool in_overview_mode) {
-  const bool stack_directly_above_toplevel = in_overview_mode || is_fullscreen_;
-  transients_->AddWindow(transient_win, stack_directly_above_toplevel);
+  transients_->AddWindow(transient_win);
 }
 
 void LayoutManager::ToplevelWindow::HandleTransientWindowUnmap(

@@ -1,4 +1,4 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -11,6 +11,7 @@
 #include "base/basictypes.h"
 #include "base/memory/scoped_ptr.h"
 #include "window_manager/geometry.h"
+#include "window_manager/stacking_manager.h"
 #include "window_manager/util.h"
 #include "window_manager/window.h"
 #include "window_manager/x11/x_types.h"
@@ -25,6 +26,15 @@ class WindowManager;
 // "owner" window.
 class TransientWindowCollection {
  public:
+  enum StackingPolicy {
+    // Stack transient windows directly above the owner window.
+    STACK_ABOVE_OWNER = 0,
+
+    // Stack transient windows in
+    // StackingManager::LAYER_ACTIVE_TRANSIENT_WINDOW.
+    STACK_IN_LAYER,
+  };
+
   enum CenterPolicy {
     // Center transient windows over |owner_win_|.
     CENTER_OVER_OWNER = 0,
@@ -44,20 +54,18 @@ class TransientWindowCollection {
     KEEP_ONSCREEN_IF_OWNER_IS_ONSCREEN,
   };
 
-  // |owner_win| is the window owning the transients in this collection.  If
-  // |win_to_stack_above| is non-NULL, transients are stacked above it instead
-  // of above |owner_win| (this is used for panels, which have titlebar windows
-  // that are stacked above their content windows -- we want the transient to be
-  // above the titlebar in addition to the content).  |event_consumer| is used
-  // to register interest in events concerning the windows.
+  // |owner_win| is the window owning the transients in this collection.
+  // |event_consumer| is used to register interest in events concerning the
+  // windows.
   TransientWindowCollection(Window* owner_win,
-                            Window* win_to_stack_above,
+                            StackingPolicy stacking_policy,
                             CenterPolicy center_policy,
                             KeepOnscreenPolicy keep_onscreen_policy,
                             EventConsumer* event_consumer);
   ~TransientWindowCollection();
 
   bool shown() const { return shown_; }
+  void set_stacking_policy(StackingPolicy policy) { stacking_policy_ = policy; }
 
   // Do we contain the passed-in window?
   bool ContainsWindow(const Window& win) const;
@@ -74,14 +82,16 @@ class TransientWindowCollection {
   // already has the focus.
   void SetPreferredWindowToFocus(Window* transient_win);
 
+  // Change the stacking policy.
+  // Automatically calls ApplyStackingForAllWindows().
+  void ChangeStackingPolicy(StackingPolicy policy);
+
   // Add a transient window.  This should be called in response to the
   // window being mapped.  The transient will typically be stacked above
   // any other existing transients (unless an existing transient is modal),
-  // but if this is the only transient, it will be stacked above the owner
-  // if |stack_directly_above_owner| is true and in
-  // StackingManager::LAYER_ACTIVE_TRANSIENT_WINDOW otherwise.
-  void AddWindow(Window* transient_win,
-                 bool stack_directly_above_owner);
+  // but if this is the only transient, it will be stacked according to
+  // |stacking_policy_|.
+  void AddWindow(Window* transient_win);
 
   // Remove a transient window.
   // This should be called in response to the window being unmapped.
@@ -92,11 +102,8 @@ class TransientWindowCollection {
   void ConfigureAllWindowsRelativeToOwner(int anim_ms);
 
   // Stack all transient windows' composited and client windows in the
-  // order dictated by |stacked_transients_|.  If
-  // |stack_directly_above_owner| is false, then we stack the transients at
-  // StackingManager::LAYER_ACTIVE_TRANSIENT_WINDOW instead of directly
-  // above |owner_win_|.
-  void ApplyStackingForAllWindows(bool stack_directly_above_owner);
+  // order dictated by |stacked_transients_|.
+  void ApplyStackingForAllWindows();
 
   // Handle a ConfigureRequest event about one of our transient windows.
   void HandleConfigureRequest(Window* transient_win,
@@ -167,12 +174,14 @@ class TransientWindowCollection {
   // (since it should remain offscreen).
   void ConfigureTransientWindow(TransientWindow* transient, int anim_ms);
 
-  // Stack a transient window's composited and client windows.  If
-  // |other_win| is non-NULL, we stack |transient| above it; otherwise,
-  // we stack |transient| at the top of
+  // Stack a transient window's composited and client windows.  If |sibling_win|
+  // is non-NULL, we stack |transient| above or below it depending on
+  // |sibling_policy|; otherwise, we stack |transient| at the top of
   // StackingManager::LAYER_ACTIVE_TRANSIENT_WINDOW.
   void ApplyStackingForTransientWindow(
-      TransientWindow* transient, Window* other_win);
+      TransientWindow* transient,
+      Window* sibling_win,
+      StackingManager::SiblingPolicy sibling_policy);
 
   // Choose a new transient window to focus.  We choose the topmost modal
   // window if there is one; otherwise we just return the topmost
@@ -187,10 +196,6 @@ class TransientWindowCollection {
 
   // Window owning this collection.  Not owned by us.
   Window* owner_win_;
-
-  // Window above which all transients should be stacked.  Typically
-  // |owner_win_|, but see the comment in the constructor.
-  Window* win_to_stack_above_;
 
   // Event consumer that we register as being interested in events about
   // our transient windows.  The consumer should pass ConfigureRequest
@@ -211,6 +216,7 @@ class TransientWindowCollection {
   // Are we currently showing all of the windows in this collection?
   bool shown_;
 
+  StackingPolicy stacking_policy_;
   CenterPolicy center_policy_;
   KeepOnscreenPolicy keep_onscreen_policy_;
 

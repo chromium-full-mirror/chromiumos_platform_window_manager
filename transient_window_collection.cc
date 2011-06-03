@@ -1,4 +1,4 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,7 +6,6 @@
 
 #include <list>
 
-#include "window_manager/stacking_manager.h"
 #include "window_manager/window_manager.h"
 
 using std::list;
@@ -17,16 +16,16 @@ namespace window_manager {
 
 TransientWindowCollection::TransientWindowCollection(
     Window* owner_win,
-    Window* win_to_stack_above,
+    StackingPolicy stacking_policy,
     CenterPolicy center_policy,
     KeepOnscreenPolicy keep_onscreen_policy,
     EventConsumer* event_consumer)
     : owner_win_(owner_win),
-      win_to_stack_above_(win_to_stack_above ? win_to_stack_above : owner_win),
       event_consumer_(event_consumer),
       stacked_transients_(new Stacker<TransientWindow*>),
       transient_to_focus_(NULL),
       shown_(true),
+      stacking_policy_(stacking_policy),
       center_policy_(center_policy),
       keep_onscreen_policy_(keep_onscreen_policy) {
   DCHECK(owner_win_);
@@ -85,8 +84,7 @@ void TransientWindowCollection::SetPreferredWindowToFocus(
     transient_to_focus_ = transient;
 }
 
-void TransientWindowCollection::AddWindow(
-    Window* transient_win, bool stack_directly_above_owner) {
+void TransientWindowCollection::AddWindow(Window* transient_win) {
   CHECK(transient_win);
   if (ContainsWindow(*transient_win)) {
     LOG(ERROR) << "Got request to add already-present transient window "
@@ -113,22 +111,39 @@ void TransientWindowCollection::AddWindow(
     transient->centered = true;
   }
 
+  Window* sibling_window = NULL;
+  StackingManager::SiblingPolicy sibling_policy =
+      StackingManager::ABOVE_SIBLING;
+
   // If the new transient is non-modal, stack it above the top non-modal
   // transient that we have.  If it's modal, just put it on top of all
   // other transients.
-  TransientWindow* transient_to_stack_above = NULL;
   for (list<TransientWindow*>::const_iterator it =
            stacked_transients_->items().begin();
        it != stacked_transients_->items().end(); ++it) {
     if (transient_win->wm_state_modal() || !(*it)->win->wm_state_modal()) {
-      transient_to_stack_above = (*it);
+      stacked_transients_->AddAbove(transient.get(), (*it));
+      sibling_window = (*it)->win;
+      sibling_policy = StackingManager::ABOVE_SIBLING;
       break;
     }
   }
-  if (transient_to_stack_above)
-    stacked_transients_->AddAbove(transient.get(), transient_to_stack_above);
-  else
+
+  if (!sibling_window) {
+    if (!stacked_transients_->items().empty()) {
+      // If we have other transients already but they should all be above this
+      // one, then stack it directly underneath the bottom one.
+      sibling_window = stacked_transients_->items().back()->win;
+      sibling_policy = StackingManager::BELOW_SIBLING;
+    } else {
+      // Okay, this is the only transient.  Stack it above the owner or at the
+      // top of the transient window layer, depending on the policy.
+      sibling_window =
+          (stacking_policy_ == STACK_ABOVE_OWNER) ? owner_win_ : NULL;
+      sibling_policy = StackingManager::ABOVE_SIBLING;
+    }
     stacked_transients_->AddOnBottom(transient.get());
+  }
 
   SetPreferredWindowToFocus(transient_win);
   wm()->focus_manager()->UseClickToFocusForWindow(
@@ -139,10 +154,7 @@ void TransientWindowCollection::AddWindow(
                                Window::VISIBILITY_HIDDEN);
   ConfigureTransientWindow(transient.get(), 0);
   ApplyStackingForTransientWindow(
-      transient.get(),
-      transient_to_stack_above ?
-      transient_to_stack_above->win :
-      (stack_directly_above_owner ? win_to_stack_above_ : NULL));
+      transient.get(), sibling_window, sibling_policy);
 }
 
 void TransientWindowCollection::RemoveWindow(Window* transient_win) {
@@ -176,15 +188,16 @@ void TransientWindowCollection::ConfigureAllWindowsRelativeToOwner(
   }
 }
 
-void TransientWindowCollection::ApplyStackingForAllWindows(
-    bool stack_directly_above_owner) {
-  Window* prev_win = stack_directly_above_owner ? win_to_stack_above_ : NULL;
+void TransientWindowCollection::ApplyStackingForAllWindows() {
+  Window* prev_win =
+      (stacking_policy_ == STACK_ABOVE_OWNER) ? owner_win_ : NULL;
   for (list<TransientWindow*>::const_reverse_iterator it =
            stacked_transients_->items().rbegin();
        it != stacked_transients_->items().rend();
        ++it) {
     TransientWindow* transient = *it;
-    ApplyStackingForTransientWindow(transient, prev_win);
+    ApplyStackingForTransientWindow(
+        transient, prev_win, StackingManager::ABOVE_SIBLING);
     prev_win = transient->win;
   }
 }
@@ -318,13 +331,15 @@ void TransientWindowCollection::ConfigureTransientWindow(
 }
 
 void TransientWindowCollection::ApplyStackingForTransientWindow(
-    TransientWindow* transient, Window* other_win) {
+    TransientWindow* transient,
+    Window* sibling_win,
+    StackingManager::SiblingPolicy sibling_policy) {
   DCHECK(transient);
-  if (other_win) {
+  if (sibling_win) {
     wm()->stacking_manager()->StackWindowRelativeToOtherWindow(
         transient->win,
-        other_win,
-        StackingManager::ABOVE_SIBLING,
+        sibling_win,
+        sibling_policy,
         StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
         StackingManager::LAYER_ACTIVE_TRANSIENT_WINDOW);
   } else {
@@ -361,7 +376,8 @@ void TransientWindowCollection::RestackTransientWindowOnTop(
       stacked_transients_->items().front();
   stacked_transients_->Remove(transient);
   stacked_transients_->AddOnTop(transient);
-  ApplyStackingForTransientWindow(transient, transient_to_stack_above->win);
+  ApplyStackingForTransientWindow(
+      transient, transient_to_stack_above->win, StackingManager::ABOVE_SIBLING);
 }
 
 }  // namespace window_manager
