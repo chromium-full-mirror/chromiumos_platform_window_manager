@@ -274,6 +274,10 @@ class MockCompositor : public Compositor {
       const std::tr1::unordered_set<int>& groups) {
     active_visibility_groups_ = groups;
   }
+  virtual void GetActiveVisibilityGroups(
+      std::tr1::unordered_set<int>* groups_out) {
+    *groups_out = active_visibility_groups_;
+  }
   virtual void ForceDraw() { num_forced_draws_++; }
   // End Compositor methods
 

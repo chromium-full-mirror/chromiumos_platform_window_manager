@@ -8,6 +8,7 @@
 #include <ctime>
 #include <list>
 #include <queue>
+#include <tr1/unordered_set>
 
 extern "C" {
 #include <X11/cursorfont.h>
@@ -75,6 +76,7 @@ using std::map;
 using std::set;
 using std::string;
 using std::tr1::shared_ptr;
+using std::tr1::unordered_set;
 using std::vector;
 using window_manager::util::FindWithDefault;
 using window_manager::util::GetTimeAsString;
@@ -1316,9 +1318,25 @@ void WindowManager::HandleScreenResize(const Size& new_size) {
   // The window manager sometimes tries to fetch an updated
   // pixmap for a resized window while the window is unredirected, resulting
   // in a black screen until compositing is toggled on and off again.
-  // To avoid this, disable compositing while resizing.
+  // To avoid this, disable unredirection while resizing.
   scoped_ptr<ScopedCompositingRequest> comp_request(
       CreateScopedCompositingRequest());
+
+#ifdef BOGUS_SCREEN_RESIZES
+  // If the screen doesn't actually get resized and we instead just receive a
+  // synthetic ConfigureNotify event about the root, then in the
+  // screen-getting-smaller case, we'll end up with a region of the overlay
+  // window that we're no longer painting.  Clear the stage first to make sure
+  // that we're not showing stale junk in the region after we resize the stage.
+  if (new_size.width < root_bounds_.width ||
+      new_size.height < root_bounds_.height) {
+    unordered_set<int> old_groups;
+    compositor_->GetActiveVisibilityGroups(&old_groups);
+    compositor_->SetActiveVisibilityGroup(VISIBILITY_GROUP_BLANK);
+    compositor_->ForceDraw();
+    compositor_->SetActiveVisibilityGroups(old_groups);
+  }
+#endif
 
   root_bounds_.resize(new_size, GRAVITY_NORTHWEST);
   SetEwmhSizeProperties();

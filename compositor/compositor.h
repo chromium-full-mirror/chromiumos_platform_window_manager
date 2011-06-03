@@ -245,6 +245,10 @@ class Compositor {
   virtual void SetActiveVisibilityGroups(
       const std::tr1::unordered_set<int>& groups) = 0;
 
+  // Get the current set of active visibility groups.
+  virtual void GetActiveVisibilityGroups(
+      std::tr1::unordered_set<int>* groups_out) = 0;
+
   // Convenience methods to clear the current set of visibility groups (so
   // we display all actors) or display just a single group.
   void ResetActiveVisibilityGroups();

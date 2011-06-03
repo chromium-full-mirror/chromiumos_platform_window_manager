@@ -64,6 +64,7 @@ class WindowManager : public PanelManagerAreaChangeListener,
   enum VisibilityGroups {
     VISIBILITY_GROUP_SCREEN_LOCKER = 1,
     VISIBILITY_GROUP_SESSION_ENDING = 2,
+    VISIBILITY_GROUP_BLANK = 3
   };
 
   // RAII-type object returned by CreateScopedCompositingRequest() that calls

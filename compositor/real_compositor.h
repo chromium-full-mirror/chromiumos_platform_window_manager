@@ -623,6 +623,8 @@ class RealCompositor : public Compositor {
   virtual StageActor* GetDefaultStage() { return default_stage_.get(); }
   virtual void SetActiveVisibilityGroups(
       const std::tr1::unordered_set<int>& groups);
+  virtual void GetActiveVisibilityGroups(
+      std::tr1::unordered_set<int>* groups_out);
   virtual void ForceDraw();
   // End Compositor methods
 

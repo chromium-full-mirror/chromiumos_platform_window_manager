@@ -828,6 +828,10 @@ void RealCompositor::SetActiveVisibilityGroups(
   SetDirty();
 }
 
+void RealCompositor::GetActiveVisibilityGroups(unordered_set<int>* groups_out) {
+  *groups_out = active_visibility_groups_;
+}
+
 void RealCompositor::ForceDraw() {
   force_notification_about_top_fullscreen_actor_ = true;
   SetDirty();
