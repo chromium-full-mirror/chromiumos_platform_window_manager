@@ -1,16 +1,21 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "window_manager/util.h"
 
-#include <algorithm>
-#include <cstring>
-#include <ctime>
-
+#include <dirent.h>
+#include <fcntl.h>
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <cerrno>
+#include <cstring>
+#include <ctime>
+
+#include "base/eintr_wrapper.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/string_util.h"
 #include "base/time.h"
 
@@ -19,6 +24,55 @@ using base::TimeTicks;
 using std::max;
 using std::min;
 using std::string;
+using std::vector;
+
+namespace {
+
+// Directory listing the current process's open file descriptors.
+const char kFdListDir[] = "/proc/self/fd";
+
+// Close all open file descriptors besides stdin, stdout, and stderr.
+// Returns false on failure.
+bool CloseExtraFds() {
+  DIR* dir = opendir(kFdListDir);
+  if (!dir) {
+    RAW_LOG(ERROR, "Unable to read FD list from /proc");
+    return false;
+  }
+
+  bool success = true;
+  while (true) {
+    errno = 0;
+    struct dirent* entry = readdir(dir);
+    if (!entry) {
+      success = !errno;
+      break;
+    }
+
+    // Skip '.' and '..'.
+    if (entry->d_name[0] == '.')
+      continue;
+
+    char* end_ptr = NULL;
+    const long int fd = strtol(entry->d_name, &end_ptr, 10);
+    if (*(entry->d_name) == '\0' || *end_ptr != '\0')
+      continue;
+
+    if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
+      continue;
+
+    // Don't close the FD that we're using to read the directory.
+    if (fd == dirfd(dir))
+      continue;
+
+    HANDLE_EINTR(close(fd));
+  }
+
+  closedir(dir);
+  return success;
+}
+
+}  // namespace
 
 namespace window_manager {
 
@@ -169,14 +223,55 @@ string GetHostname() {
   return string(hostname);
 }
 
-void RunCommandInBackground(string command) {
-  if (command.empty())
-    return;
+pid_t RunCommandInBackground(const vector<string>& argv) {
+  if (argv.empty() || argv[0].empty())
+    return -1;
 
-  command += " &";
+  string command = JoinString(argv, ' ');
   DLOG(INFO) << "Running command \"" << command << "\"";
-  if (system(command.c_str()) < 0)
-    LOG(WARNING) << "Got error while running \"" << command << "\"";
+
+  pid_t pid = fork();
+  if (pid == -1) {
+    PLOG(ERROR) << "fork() failed";
+    return -1;
+  }
+
+  if (pid == 0) {
+    // Child.
+    if (!CloseExtraFds()) {
+      RAW_LOG(ERROR, "Got error while closing FDs");
+      _exit(127);
+    }
+
+    // Set stdin to /dev/null.
+    int null_fd = HANDLE_EINTR(open("/dev/null", O_RDONLY));
+    if (null_fd == -1) {
+      RAW_LOG(ERROR, "Failed to open /dev/null");
+      _exit(127);
+    }
+    int new_fd = HANDLE_EINTR(dup2(null_fd, STDIN_FILENO));
+    HANDLE_EINTR(close(null_fd));
+    if (new_fd == -1) {
+      RAW_LOG(ERROR, "Failed to set stdin to /dev/null");
+      _exit(127);
+    }
+
+    scoped_array<char*> args(new char*[argv.size() + 1]);
+    for (size_t i = 0; i < argv.size(); ++i)
+      args[i] = const_cast<char*>(argv.at(i).c_str());
+    args[argv.size()] = NULL;
+    execvp(argv.at(0).c_str(), args.get());
+    RAW_LOG(ERROR, "execvp() failed");
+    _exit(127);
+
+  } else {
+    // Parent.
+    return pid;
+  }
+}
+
+void RunCommandInBackgroundCallback(vector<string> argv) {
+  RunCommandInBackground(argv);
 }
 
 void ToggleBool(bool* value) {

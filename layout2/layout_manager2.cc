@@ -53,7 +53,7 @@ using std::set;
 using std::string;
 using std::tr1::shared_ptr;
 using std::vector;
-using window_manager::util::RunCommandInBackground;
+using window_manager::util::RunCommandInBackgroundCallback;
 using window_manager::util::ToggleBool;
 using window_manager::util::XidStr;
 
@@ -608,9 +608,11 @@ void LayoutManager2::InitKeyBindings() {
         kResizeRightAction);
   }
 
+  vector<string> xterm_argv;
+  xterm_argv.push_back(FLAGS_xterm_command);
   key_bindings_actions_->AddAction(
       kLaunchTerminalAction,
-      NewPermanentCallback(&RunCommandInBackground, FLAGS_xterm_command),
+      NewPermanentCallback(&RunCommandInBackgroundCallback, xterm_argv),
       NULL, NULL);
   key_bindings_group_->AddBinding(
       KeyBindings::KeyCombo(

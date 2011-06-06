@@ -1,15 +1,18 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #ifndef WINDOW_MANAGER_UTIL_H_
 #define WINDOW_MANAGER_UTIL_H_
 
+#include <sys/types.h>
+
 #include <algorithm>
 #include <ctime>
 #include <list>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "base/basictypes.h"
 #include "base/hash_tables.h"
@@ -281,15 +284,16 @@ bool SetUpLogSymlink(const std::string& symlink_path,
 // Get the machine's hostname, as returned by gethostname().
 std::string GetHostname();
 
-// Run a command using system().  '&' is appended.
-// Ideally we'd just use LaunchApp() from Chrome's process_util.h instead,
-// but that method expects a pre-parsed argv and we're running commands
-// specified on the command line (and don't want to do shell-style
-// quote-handling ourselves).
-//
-// The argument is not a reference because the callback code that we're
-// using from protobuf has trouble with references.
-void RunCommandInBackground(std::string command);
+// Fork and exec a command.  On error, -1 is returned; otherwise it's the forked
+// process's PID.  The caller is responsible for cleaning up the forked process
+// (if SIGCHLD hasn't been set to SIG_IGN).
+pid_t RunCommandInBackground(const std::vector<std::string>& argv);
+
+// Wrapper around RunCommandInBackground() that can be used as a callback.
+// The argument isn't a reference or pointer because the callback code that
+// we're using from protobuf has trouble with them.  Note that you need to set
+// SIGCHLD to SIG_IGN if you use this.
+void RunCommandInBackgroundCallback(std::vector<std::string> argv);
 
 // Toggle the state of |value|.
 void ToggleBool(bool* value);

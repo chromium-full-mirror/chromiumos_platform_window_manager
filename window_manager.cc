@@ -1990,25 +1990,23 @@ void WindowManager::TakeScreenshot(bool use_active_window) {
     return;
   }
 
-  string command = FLAGS_screenshot_binary;
+  vector<string> argv;
+  argv.push_back(FLAGS_screenshot_binary);
 
   if (use_active_window) {
     if (!active_window_xid_) {
       LOG(WARNING) << "No active window to use for screenshot";
       return;
     }
-    command += StringPrintf(" --window=0x%lx", active_window_xid_);
+    argv.push_back(StringPrintf("--window=0x%lx", active_window_xid_));
   }
 
   string filename = StringPrintf("%s/screenshot-%s.png", dir.c_str(),
                                  GetTimeAsString(GetCurrentTimeSec()).c_str());
-  command += " " + filename + " &";
+  argv.push_back(filename);
 
-  if (system(command.c_str()) < 0) {
-    LOG(ERROR) << "Taking screenshot via \"" << command << "\" failed";
-  } else {
-    LOG(INFO) << "Saved screenshot to " << filename;
-  }
+  LOG(INFO) << "Saving screenshot to " << filename;
+  RunCommandInBackground(argv);
 }
 
 void WindowManager::CreateStartupBackground() {

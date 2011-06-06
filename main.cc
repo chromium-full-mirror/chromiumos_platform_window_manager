@@ -5,13 +5,13 @@
 #include <unistd.h>
 
 #include <cmath>
+#include <csignal>
 #include <cstdlib>
 #include <ctime>
 
 extern "C" {
 #include <X11/Xlib.h>
 }
-
 #include <gflags/gflags.h>
 
 #include "base/at_exit.h"
@@ -109,6 +109,8 @@ int main(int argc, char** argv) {
   // asserts, but Breakpad only installs signal handlers for SEGV, ABRT,
   // FPE, ILL, and BUS.  Use our own function to send ABRT instead.
   logging::SetLogAssertHandler(HandleLogAssert);
+
+  signal(SIGCHLD, SIG_IGN);
 
 #if defined(PROFILE_BUILD)
   const string profile_basename = StringPrintf(
