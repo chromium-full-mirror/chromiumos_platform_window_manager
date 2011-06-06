@@ -285,9 +285,6 @@ void PanelBar::HandleInputWindowButtonPress(XWindow xid,
                                             const Point& absolute_pos,
                                             int button,
                                             XTime timestamp) {
-  if (wm()->IsModalWindowFocused())
-    return;
-
   CHECK(xid == anchor_input_xid_);
   if (button != 1)
     return;
@@ -347,8 +344,6 @@ void PanelBar::HandleInputWindowPointerLeave(XWindow xid,
 void PanelBar::HandlePanelButtonPress(Panel* panel,
                                       int button,
                                       XTime timestamp) {
-  if (wm()->IsModalWindowFocused())
-    return;
   DCHECK(panel);
   DLOG(INFO) << "Got button press in panel " << panel->xid_str()
              << "; giving it the focus";

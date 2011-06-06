@@ -1091,29 +1091,6 @@ TEST_F(PanelBarTest, ModalDimming) {
             stage->GetStackingIndex(panel->content_win()->GetBottomActor()));
 }
 
-TEST_F(PanelBarTest, DontStealFocusFromModalWindow) {
-  // Create a toplevel window and give it a modal dialog.
-  XWindow toplevel_xid = CreateSimpleWindow();
-  SendInitialEventsForWindow(toplevel_xid);
-  XWindow transient_xid = CreateSimpleWindow();
-  xconn_->GetWindowInfoOrDie(transient_xid)->transient_for = toplevel_xid;
-  AppendAtomToProperty(transient_xid,
-                       xconn_->GetAtomOrDie("_NET_WM_STATE"),
-                       xconn_->GetAtomOrDie("_NET_WM_STATE_MODAL"));
-  SendInitialEventsForWindow(transient_xid);
-
-  // Create a panel and check that the modal dialog retains the focus.
-  Panel* panel = CreatePanel(200, 20, 400);
-  EXPECT_EQ(transient_xid, xconn_->focused_xid());
-
-  // The modal dialog should also keep the focus if we click on the panel's
-  // content window.
-  XEvent event;
-  xconn_->InitButtonPressEvent(&event, panel->content_xid(), Point(0, 0), 1);
-  wm_->HandleEvent(&event);
-  EXPECT_EQ(transient_xid, xconn_->focused_xid());
-}
-
 }  // namespace window_manager
 
 int main(int argc, char** argv) {

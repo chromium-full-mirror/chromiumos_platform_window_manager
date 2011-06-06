@@ -40,7 +40,7 @@ class ModalityHandler : public EventConsumer,
   bool modal_window_is_focused() const { return modal_window_is_focused_; }
 
   // EventConsumer implementation.
-  virtual bool IsInputWindow(XWindow xid) { return false; }
+  virtual bool IsInputWindow(XWindow xid) { return xid == input_xid_; }
   virtual void HandleScreenResize();
   virtual void HandleLoggedInStateChange() {}
   virtual bool HandleWindowMapRequest(Window* win) { return false; }
@@ -105,6 +105,10 @@ class ModalityHandler : public EventConsumer,
   // Partially-transparent black rectangle that we display beneath a modal
   // transient window to emphasize it.
   scoped_ptr<Compositor::ColoredBoxActor> dimming_actor_;
+
+  // Fullscreen input window that we stack under a focused modal transient
+  // window to keep other windows from receiving events.
+  XWindow input_xid_;
 
   // Listeners that will be notified when modality changes.
   std::set<ModalityChangeListener*> modality_change_listeners_;  // not owned

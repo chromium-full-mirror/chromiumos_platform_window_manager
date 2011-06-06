@@ -56,6 +56,7 @@ TEST_F(ModalityHandlerTest, Basic) {
   EXPECT_FALSE(handler_->modal_window_is_focused());
   EXPECT_TRUE(dimming_actor->is_shown());
   EXPECT_DOUBLE_EQ(0, dimming_actor->opacity());
+  EXPECT_TRUE(WindowIsOffscreen(handler_->input_xid_));
 
   // Create a regular toplevel window.
   XWindow toplevel_xid = CreateSimpleWindow();
@@ -68,13 +69,17 @@ TEST_F(ModalityHandlerTest, Basic) {
   SendInitialEventsForWindow(transient_xid);
   ASSERT_EQ(transient_xid, xconn_->focused_xid());
 
-  // The handler should claim that a modal dialog is focused now and the
-  // dimming actor should be stacked directly under the transient.
+  // The handler should claim that a modal dialog is focused now and the dimming
+  // actor and input window should be stacked directly under the transient.
   EXPECT_TRUE(handler_->modal_window_is_focused());
   EXPECT_GT(dimming_actor->opacity(), 0);
   EXPECT_EQ(stage->GetStackingIndex(
                 wm_->GetWindowOrDie(transient_xid)->GetBottomActor()) + 1,
             stage->GetStackingIndex(dimming_actor));
+  EXPECT_EQ(xconn_->stacked_xids().GetIndex(transient_xid) + 1,
+            xconn_->stacked_xids().GetIndex(handler_->input_xid_));
+  EXPECT_EQ(xconn_->GetWindowInfoOrDie(xconn_->GetRootWindow())->bounds,
+            xconn_->GetWindowInfoOrDie(handler_->input_xid_)->bounds);
 
   // Make the transient window non-modal and notify the window manager that the
   // property changed.
@@ -86,10 +91,11 @@ TEST_F(ModalityHandlerTest, Basic) {
   xconn_->InitPropertyNotifyEvent(&event, transient_xid, kStateAtom);
   wm_->HandleEvent(&event);
 
-  // The handler should set its modal-is-focused member to false and make the
-  // dimming actor invisible.
+  // The handler should set its modal-is-focused member to false, make the
+  // dimming actor invisible, and move the input window offscreen.
   EXPECT_FALSE(handler_->modal_window_is_focused());
   EXPECT_DOUBLE_EQ(0, dimming_actor->opacity());
+  EXPECT_TRUE(WindowIsOffscreen(handler_->input_xid_));
 
   // Make the window modal again.
   xconn_->InitClientMessageEvent(
@@ -100,12 +106,15 @@ TEST_F(ModalityHandlerTest, Basic) {
   wm_->HandleEvent(&event);
   EXPECT_TRUE(handler_->modal_window_is_focused());
   EXPECT_GT(dimming_actor->opacity(), 0);
+  EXPECT_EQ(xconn_->GetWindowInfoOrDie(xconn_->GetRootWindow())->bounds,
+            xconn_->GetWindowInfoOrDie(handler_->input_xid_)->bounds);
 
   // Unmap it and check that we reset everything.
   xconn_->InitUnmapEvent(&event, transient_xid);
   wm_->HandleEvent(&event);
   EXPECT_FALSE(handler_->modal_window_is_focused());
   EXPECT_DOUBLE_EQ(0, dimming_actor->opacity());
+  EXPECT_TRUE(WindowIsOffscreen(handler_->input_xid_));
 }
 
 TEST_F(ModalityHandlerTest, NotifyListener) {

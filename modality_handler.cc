@@ -29,20 +29,25 @@ ModalityHandler::ModalityHandler(WindowManager* wm)
       modal_window_is_focused_(false),
       dimming_actor_(
           wm_->compositor()->CreateColoredBox(
-              wm_->width(), wm_->height(), Compositor::Color(0, 0, 0))) {
+              wm_->width(), wm_->height(), Compositor::Color(0, 0, 0))),
+      input_xid_(wm_->CreateInputWindow(Rect(-1, -1, 1, 1), 0)) {
   wm_->focus_manager()->RegisterFocusChangeListener(this);
   dimming_actor_->SetName("modal window dimming");
   dimming_actor_->SetOpacity(0, 0);
   dimming_actor_->Show();
+  wm_->SetNamePropertiesForXid(input_xid_, "modal input window");
   wm_->stage()->AddActor(dimming_actor_.get());
 }
 
 ModalityHandler::~ModalityHandler() {
   wm_->focus_manager()->UnregisterFocusChangeListener(this);
+  wm_->xconn()->DestroyWindow(input_xid_);
 }
 
 void ModalityHandler::HandleScreenResize() {
   dimming_actor_->SetSize(wm_->width(), wm_->height());
+  if (modal_window_is_focused_)
+    wm_->ConfigureInputWindow(input_xid_, wm_->root_bounds());
 }
 
 void ModalityHandler::HandleWindowMap(Window* win) {
@@ -90,15 +95,18 @@ void ModalityHandler::HandlePossibleModalityChange() {
         dimming_actor_.get(),
         focused_win->GetBottomActor(),
         StackingManager::BELOW_SIBLING);
+    wm_->xconn()->StackWindow(input_xid_, focused_win->xid(), false);
     if (!modal_window_is_focused_) {
       modal_window_is_focused_ = true;
       dimming_actor_->SetOpacity(kDimmingOpacity, kDimmingFadeMs);
+      wm_->ConfigureInputWindow(input_xid_, wm_->root_bounds());
       changed = true;
     }
   } else {
     if (modal_window_is_focused_) {
       modal_window_is_focused_ = false;
       dimming_actor_->SetOpacity(0, kDimmingFadeMs);
+      wm_->xconn()->ConfigureWindowOffscreen(input_xid_);
       changed = true;
     }
   }
