@@ -1255,19 +1255,11 @@ void LayoutManager::CalculatePositionsForOverviewMode(bool enforce_bounds) {
 
   ToplevelWindow* last_toplevel = snapshots_[0]->toplevel();
   int running_width = 0;
-  int selected_index = 0;
-  int selected_offset = 0;
   const int snapshot_width = snapshots_[0]->win()->client_width();
   const int snapshot_height = snapshots_[0]->win()->client_height();
   for (int i = 0; static_cast<size_t>(i) < snapshots_.size(); ++i) {
     SnapshotWindow* snapshot = snapshots_[i].get();
     bool is_selected = (snapshot == current_snapshot_);
-
-    if (is_selected) {
-      selected_index = i;
-      selected_offset = running_width;
-    }
-
     double scale = is_selected ? 1.0 : kOverviewNotSelectedScale;
     snapshot->SetSize(snapshot_width * scale, snapshot_height * scale);
     int vertical_position = (height_ - snapshot->overview_height()) / 2 +

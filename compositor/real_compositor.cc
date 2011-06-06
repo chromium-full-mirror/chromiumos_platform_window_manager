@@ -21,6 +21,7 @@
 #include "window_manager/compositor/xrender/xrender_visitor.h"
 #endif
 #include "window_manager/compositor/layer_visitor.h"
+#include "window_manager/compositor/texture_data.h"
 #include "window_manager/event_loop.h"
 #include "window_manager/image_container.h"
 #include "window_manager/profiler.h"
@@ -561,6 +562,13 @@ void RealCompositor::ContainerActor::LowerChild(
 RealCompositor::QuadActor::QuadActor(RealCompositor* compositor)
     : RealCompositor::Actor(compositor),
       color_(1.f, 1.f, 1.f) {
+}
+
+RealCompositor::QuadActor::~QuadActor() {
+}
+
+void RealCompositor::QuadActor::set_texture_data(TextureData* texture_data) {
+  texture_data_.reset(texture_data);
 }
 
 RealCompositor::Actor* RealCompositor::QuadActor::Clone() {

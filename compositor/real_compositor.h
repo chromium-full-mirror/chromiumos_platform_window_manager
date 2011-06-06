@@ -373,7 +373,7 @@ class RealCompositor : public Compositor {
   // TexturePixmapActor, and ImageActor).
   class QuadActor : public RealCompositor::Actor {
    public:
-    virtual ~QuadActor() {}
+    virtual ~QuadActor();
 
     const Compositor::Color& color() const { return color_; }
 
@@ -384,9 +384,7 @@ class RealCompositor : public Compositor {
     // End Compositor::Actor methods.
 
     TextureData* texture_data() const { return texture_data_.get(); }
-    void set_texture_data(TextureData* texture_data) {
-      texture_data_.reset(texture_data);
-    }
+    void set_texture_data(TextureData* texture_data);
 
     // Implement VisitorDestination for visitor.
     void Accept(ActorVisitor* visitor) {
