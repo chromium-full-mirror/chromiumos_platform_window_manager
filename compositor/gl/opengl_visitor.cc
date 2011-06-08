@@ -23,6 +23,8 @@
 #include "window_manager/profiler.h"
 #include "window_manager/util.h"
 
+using std::vector;
+
 DECLARE_bool(compositor_display_debug_needle);
 
 #ifndef COMPOSITOR_OPENGL
@@ -457,6 +459,8 @@ void OpenGlDrawVisitor::DrawNeedle() {
   gl_interface_->Rotatef(num_frames_drawn_, 0.f, 0.f, 1.f);
   gl_interface_->Scalef(30, 3, 1.f);
   gl_interface_->Color4f(1.f, 0.f, 0.f, 0.8f);
+  gl_interface_->Scissor(damaged_region_.x, damaged_region_.y,
+                         damaged_region_.width, damaged_region_.height);
   gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
   gl_interface_->PopMatrix();
   PROFILER_MARKER_END(DrawNeedle);
@@ -497,18 +501,21 @@ void OpenGlDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
     // implement eglSwapBuffers().  An improvement to this algorithm
     // could first attempt to detect whether buffer flipping is being
     // used by performing a series of swaps and readbacks.
-    if (damaged_region_.area() < half_stage_area) {
+    if (damaged_region_.area() < half_stage_area)
       do_partial_update = true;
-
-      gl_interface_->Enable(GL_SCISSOR_TEST);
-      gl_interface_->Scissor(damaged_region_.x, damaged_region_.y,
-                             damaged_region_.width, damaged_region_.height);
-    }
   }
 
+  if (!do_partial_update)
+    damaged_region_.reset(0, 0, actor->width(), actor->height());
+
+  gl_interface_->Enable(GL_SCISSOR_TEST);
+
   // No need to clear color buffer if something will cover up the screen.
-  if (!has_fullscreen_actor_)
+  if (!has_fullscreen_actor_) {
+    gl_interface_->Scissor(damaged_region_.x, damaged_region_.y,
+                           damaged_region_.width, damaged_region_.height);
     gl_interface_->Clear(GL_COLOR_BUFFER_BIT);
+  }
 
   using_passthrough_projection_ = actor->using_passthrough_projection();
 
@@ -539,9 +546,10 @@ void OpenGlDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
   if (FLAGS_compositor_display_debug_needle)
     DrawNeedle();
 
+  gl_interface_->Disable(GL_SCISSOR_TEST);
+
   PROFILER_MARKER_BEGIN(Swap_Buffer);
   if (do_partial_update) {
-    gl_interface_->Disable(GL_SCISSOR_TEST);
     gl_interface_->CopyGlxSubBuffer(actor->GetStageXWindow(),
                                     damaged_region_.x,
                                     damaged_region_.y,
@@ -660,7 +668,6 @@ void OpenGlDrawVisitor::VisitTexturePixmap(
 void OpenGlDrawVisitor::VisitQuad(RealCompositor::QuadActor* actor) {
   if (!actor->IsVisible())
     return;
-
 #ifdef EXTRA_LOGGING
   DLOG(INFO) << "Drawing quad " << actor->name() << ".";
 #endif
@@ -765,7 +772,18 @@ void OpenGlDrawVisitor::VisitQuad(RealCompositor::QuadActor* actor) {
   // operator[] in Matrix4 returns by value in const version.
   Matrix4 model_view = actor->model_view();
   gl_interface_->LoadMatrixf(&model_view[0][0]);
-  gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  // Draw each clip rect separately by setting the scissor box. This can
+  // be inefficient when the number of rects is large compared to the
+  // occlusion culled area.
+  // TODO(reveman): Find the clip-rects/culled-area ratio where it becomes
+  // more efficient to draw the bounding box.
+  vector<Rect>::const_iterator iterator = actor->clip().rects().begin();
+  for (; iterator != actor->clip().rects().end(); ++iterator) {
+    Rect region(*iterator);
+    region.intersect(damaged_region_);
+    gl_interface_->Scissor(region.x, region.y, region.width, region.height);
+    gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  }
   gl_interface_->PopMatrix();
   CHECK_GL_ERROR(gl_interface_);
   PROFILER_DYNAMIC_MARKER_END();
