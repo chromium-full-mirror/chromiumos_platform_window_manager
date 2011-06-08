@@ -77,6 +77,7 @@ srcs = Split('''\
   util.cc
   wm_ipc.cc
   x11/real_x_connection.cc
+  x11/region.cc
   x11/x_connection.cc
   x11/x_connection_internal.cc
 ''')
