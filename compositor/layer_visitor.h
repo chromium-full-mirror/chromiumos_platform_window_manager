@@ -91,6 +91,11 @@ class LayerVisitor : virtual public RealCompositor::ActorVisitor {
   // visible actor.
   bool visiting_top_visible_actor_;
 
+  // The screen clip region for the currently visited actor. Clip is in
+  // screen coordinates where (0, 0) is bottom_left and (w-1, h-1) is
+  // top_right.
+  Region visiting_clip_;
+
   // This keeps track of the actor that is fullscreen and topmost visible
   // during the traversal. It is set to NULL if either of the criteria is
   // not satisfied.

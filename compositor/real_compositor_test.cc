@@ -750,6 +750,94 @@ TEST_F(RealCompositorTest, SynchronizeAnimations) {
   EXPECT_EQ(kSrcX, actor2->GetX());
 }
 
+TEST_F(RealCompositorTreeTest, Clipping) {
+  LayerVisitor layer_visitor(compositor_->actor_count(), false);
+  int y = stage_->height() - 300;
+
+  // Overlapping rects. rect3 is on top, rect2 is beneath it, and rect1
+  // is beneath rect2.
+  // +-----+-----+-----+
+  // |     |     |     |
+  // |     |     |     |
+  // |  1  |  2  |  3  |
+  // |     |     |     |
+  // |     |     |     |
+  // +-----+-----+-----+
+  rect1_->Move(0, y, 0);
+  rect1_->SetSize(300, 300);
+  rect2_->Move(100, y, 0);
+  rect2_->SetSize(200, 300);
+  rect3_->Move(200, y, 0);
+  rect3_->SetSize(100, 300);
+  // Traverse the tree to update clip.
+  stage_->Accept(&layer_visitor);
+
+  // Only left side of rect1 is visible.
+  EXPECT_EQ(Region(Rect(0, 0, 100, 300)), rect1_->clip());
+  // Only left side of rect2 is visible.
+  EXPECT_EQ(Region(Rect(100, 0, 100, 300)), rect2_->clip());
+  // rect3 is not occluded.
+  EXPECT_EQ(Region(Rect(200, 0, 100, 300)), rect3_->clip());
+
+  // Move rect3 to the left and change size of rect2 so it is completely
+  // covered by rect3. rect1 is now visible on the right.
+  // +-----+-----+-----+
+  // |     |     |     |
+  // |     |     |     |
+  // |  1  | 2/3 |  1  |
+  // |     |     |     |
+  // |     |     |     |
+  // +-----+-----+-----+
+  rect2_->SetSize(100, 300);
+  rect3_->Move(100, y, 0);
+  stage_->Accept(&layer_visitor);
+
+  // Middle part of rect1 is occluded.
+  Region sides(Rect(0, 0, 100, 300));
+  sides.Unite(Rect(200, 0, 100, 300));
+  EXPECT_EQ(sides, rect1_->clip());
+  // rect2 is not visible.
+  EXPECT_TRUE(rect2_->clip().IsEmpty());
+
+  // Test opacity setting.
+  rect3_->SetOpacity(0.6f, 0);
+  stage_->Accept(&layer_visitor);
+
+  EXPECT_FALSE(rect3_->is_opaque());
+  // rect2 is no longer occluded.
+  EXPECT_EQ(Region(Rect(100, 0, 100, 300)), rect2_->clip());
+
+  // Test scale setting.
+  rect2_->Scale(0.5f, 1.0f, 0);
+  stage_->Accept(&layer_visitor);
+
+  EXPECT_TRUE(rect2_->IsTransformed());
+  // rect1 is no longer occluded.
+  EXPECT_EQ(Region(Rect(0, 0, 300, 300)), rect1_->clip());
+
+  // Restore rect3 opacity.
+  rect3_->SetOpacity(1.0f, 0);
+  stage_->Accept(&layer_visitor);
+
+  EXPECT_TRUE(rect3_->is_opaque());
+  // rect2 is no longer visible.
+  EXPECT_TRUE(rect2_->clip().IsEmpty());
+
+  // Move transformed rect2 slightly to the left of rect3.
+  // +---+---+-----------+
+  // |   |   |     |     |
+  // |   |   |     |     |
+  // | 1 | 2 |  3  |  1  |
+  // |   |   |     |     |
+  // |   |   |     |     |
+  // +---+---+-----------+
+  rect2_->Move(50, y, 0);
+  stage_->Accept(&layer_visitor);
+
+  // rect1 is now occluded by rect3 but not rect2.
+  EXPECT_EQ(sides, rect1_->clip());
+}
+
 }  // namespace window_manager
 
 int main(int argc, char** argv) {

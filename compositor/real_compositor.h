@@ -22,6 +22,7 @@
 #include "window_manager/compositor/animation.h"
 #include "window_manager/compositor/compositor.h"
 #include "window_manager/math_types.h"
+#include "window_manager/x11/region.h"
 #include "window_manager/x11/x_types.h"
 
 #if !(defined(COMPOSITOR_OPENGL) || \
@@ -165,9 +166,10 @@ class RealCompositor : public Compositor {
     void set_z(float z) { z_ = z; }
     float z() const { return z_; }
 
-    // Note that is_opaque, culled, and model_view are not valid until after
-    // a LayerVisitor has been run over the tree -- that's what calculates the
-    // the opacity flag, updates model view matrix, and performs culling.
+    // Note that is_opaque, culled, clip, and model_view are not valid until
+    // after a LayerVisitor has been run over the tree -- that's what
+    // calculates the the opacity flag, updates model view matrix, and
+    // performs culling.
 
     // The model view matrix is derived from translation, scaling, rotation,
     // and tilt operations.  All actors should have model view matrices.
@@ -179,10 +181,12 @@ class RealCompositor : public Compositor {
     void set_is_opaque(bool opaque) { is_opaque_ = opaque; }
     bool culled() const { return culled_; }
     void set_culled(bool culled) { culled_ = culled; }
+    const Region& clip() const { return clip_; }
+    void set_clip(const Region& clip) { clip_.Reset(clip); }
 
     // Checks if the actor is visible on screen and should be rendered.
     virtual bool IsVisible() const {
-      return is_shown_ && !culled_ && opacity_ > 0.001f &&
+      return is_shown_ && !culled_ && opacity_ > 0.001f && !clip_.IsEmpty() &&
              IsInActiveVisibilityGroup();
     }
     float opacity() const { return opacity_; }
@@ -282,6 +286,10 @@ class RealCompositor : public Compositor {
 
     // Indicates if this actor has passed/failed the culling visibility test.
     bool culled_;
+
+    // Clip region of the actor. Area outside clip is occluded and
+    // unnecessary to draw.
+    Region clip_;
 
     // Cache model view matrix, so that it is only updated when something
     // changes and it can be reused.

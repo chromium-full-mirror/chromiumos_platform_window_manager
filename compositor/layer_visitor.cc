@@ -75,13 +75,7 @@ static LayerVisitor::BoundingBox ComputeTransformedBoundingBox(
 }
 
 static CullingResult PerformActorCullingTest(
-    const RealCompositor::StageActor& stage,
-    const RealCompositor::QuadActor& actor) {
-  static const LayerVisitor::BoundingBox region(0, 1, 0, 1);
-
-  LayerVisitor::BoundingBox box =
-    ComputeTransformedBoundingBox(stage, actor, region);
-
+  const LayerVisitor::BoundingBox& box) {
   if (!IsBoxOnScreen(box))
     return CULLING_WINDOW_OFFSCREEN;
 
@@ -110,6 +104,23 @@ static LayerVisitor::BoundingBox MapRegionToGlCoordinates(
   return ComputeTransformedBoundingBox(stage, actor, box);
 }
 
+// The output region is defined in the screen coordinates.
+static Rect MapGlCoordinatesToClipRect(const LayerVisitor::BoundingBox& box,
+                                       int stage_width,
+                                       int stage_height) {
+  Rect region;
+  float x_min = (box.x_min + 1.f) / 2.f * stage_width;
+  float y_min = (box.y_min + 1.f) / 2.f * stage_height;
+  float x_max = (box.x_max + 1.f) / 2.f * stage_width;
+  float y_max = (box.y_max + 1.f) / 2.f * stage_height;
+  region.x = static_cast<int>(x_min);
+  region.y = static_cast<int>(y_min);
+  // Important: To be properly conservative, the differences below need to
+  // happen after the conversion to int.
+  region.width = static_cast<int>(ceil(x_max)) - region.x;
+  region.height = static_cast<int>(ceil(y_max)) - region.y;
+  return region;
+}
 
 void LayerVisitor::VisitActor(RealCompositor::Actor* actor) {
   actor->set_is_opaque(actor->opacity() > 0.999f);
@@ -123,6 +134,7 @@ void LayerVisitor::VisitStage(
   stage_actor_ = actor;
   top_fullscreen_actor_ = NULL;
   visiting_top_visible_actor_ = true;
+  visiting_clip_.Reset(Rect(0, 0, actor->width(), actor->height()));
   has_fullscreen_actor_ = false;
 
   if (use_partial_updates_)
@@ -157,6 +169,7 @@ void LayerVisitor::VisitContainer(
 void LayerVisitor::VisitTexturedQuadActor(
     RealCompositor::QuadActor* actor, bool is_texture_opaque) {
   actor->set_culled(has_fullscreen_actor_);
+  actor->set_clip(visiting_clip_);
   if (!actor->IsVisible())
     return;
 
@@ -165,15 +178,36 @@ void LayerVisitor::VisitTexturedQuadActor(
 
   // Must update model view matrix before culling test.
   actor->UpdateModelView();
-  CullingResult result =
-      PerformActorCullingTest(*stage_actor_, *actor);
 
+  static const LayerVisitor::BoundingBox region(0, 1, 0, 1);
+
+  LayerVisitor::BoundingBox box =
+      ComputeTransformedBoundingBox(*stage_actor_, *actor, region);
+
+  CullingResult result = PerformActorCullingTest(box);
+
+  Rect rect(MapGlCoordinatesToClipRect(box,
+                                       stage_actor_->width(),
+                                       stage_actor_->height()));
+  Region clip(visiting_clip_);
+  clip.Intersect(rect);
+
+  actor->set_clip(clip);
   actor->set_culled(result == CULLING_WINDOW_OFFSCREEN);
-  if (actor->culled())
+  if (actor->culled() || actor->clip().IsEmpty())
     return;
+
+  const bool quad_is_screen_aligned =
+      !actor->IsTransformed() &&
+      stage_actor_->using_passthrough_projection();
 
   if (actor->is_opaque() && result == CULLING_WINDOW_FULLSCREEN)
     has_fullscreen_actor_ = true;
+
+  // Subtract opaque screen aligned quads from clip region to avoid
+  // unnecessary drawing of occluded actors.
+  if (actor->is_opaque() && quad_is_screen_aligned)
+    visiting_clip_.Subtract(rect);
 
   visiting_top_visible_actor_ = false;
 }
@@ -216,20 +250,10 @@ void LayerVisitor::VisitTexturePixmap(
 }
 
 Rect LayerVisitor::GetDamagedRegion(int stage_width, int stage_height) {
-  Rect region;
-  if (use_partial_updates_) {
-    float x_min = (updated_area_.x_min + 1.f) / 2.f * stage_width;
-    float y_min = (updated_area_.y_min + 1.f) / 2.f * stage_height;
-    float x_max = (updated_area_.x_max + 1.f) / 2.f * stage_width;
-    float y_max = (updated_area_.y_max + 1.f) / 2.f * stage_height;
-    region.x = static_cast<int>(x_min);
-    region.y = static_cast<int>(y_min);
-    // Important: To be properly conservative, the differences below need to
-    // happen after the conversion to int.
-    region.width = static_cast<int>(ceil(x_max)) - region.x;
-    region.height = static_cast<int>(ceil(y_max)) - region.y;
-  }
-  return region;
+  if (use_partial_updates_)
+    return MapGlCoordinatesToClipRect(updated_area_, stage_width, stage_height);
+  else
+    return Rect();
 }
 
 }  // namespace window_manager

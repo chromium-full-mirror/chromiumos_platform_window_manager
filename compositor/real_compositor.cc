@@ -100,6 +100,7 @@ RealCompositor::Actor::Actor(RealCompositor* compositor)
       opacity_(1.f),
       tilt_(0.f),
       culled_(false),
+      clip_(Rect(0, 0, 1, 1)),
       model_view_(Matrix4::identity()),
       is_opaque_(false),
       has_children_(false),
