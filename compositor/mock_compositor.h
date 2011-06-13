@@ -219,7 +219,7 @@ class MockCompositor : public Compositor {
     virtual void SetAlphaMask(const uint8_t* bytes, int width, int height);
     virtual void ClearAlphaMask();
     virtual void MergeDamagedRegion(const Rect& region);
-    virtual const Rect& GetDamagedRegion() const;
+    virtual const Region& GetDamagedRegion() const;
     virtual void ResetDamagedRegion();
     // End Compositor::TexturePixmapActor methods.
 
@@ -239,7 +239,7 @@ class MockCompositor : public Compositor {
     int num_texture_updates_;
 
     // Dirty region.
-    Rect damaged_region_;
+    Region damaged_region_;
 
     DISALLOW_COPY_AND_ASSIGN(TexturePixmapActor);
   };

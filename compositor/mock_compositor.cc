@@ -192,15 +192,15 @@ void MockCompositor::TexturePixmapActor::ClearAlphaMask() {
 
 void MockCompositor::TexturePixmapActor::MergeDamagedRegion(
     const Rect& region) {
-  damaged_region_.merge(region);
+  damaged_region_.Unite(region);
 }
 
-const Rect& MockCompositor::TexturePixmapActor::GetDamagedRegion() const {
+const Region& MockCompositor::TexturePixmapActor::GetDamagedRegion() const {
   return damaged_region_;
 }
 
 void MockCompositor::TexturePixmapActor::ResetDamagedRegion() {
-  damaged_region_.reset(0, 0, 0, 0);
+  damaged_region_.Reset(Rect());
 }
 
 MockCompositor::ImageActor* MockCompositor::CreateImageFromFile(

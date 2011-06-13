@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 #include "window_manager/compositor/real_compositor.h"
 #include "window_manager/geometry.h"
@@ -16,6 +17,7 @@ namespace window_manager {
 using std::ceil;
 using std::max;
 using std::min;
+using std::vector;
 
 enum CullingResult {
   CULLING_WINDOW_OFFSCREEN,
@@ -138,7 +140,7 @@ void LayerVisitor::VisitStage(
   has_fullscreen_actor_ = false;
 
   if (use_partial_updates_)
-    updated_area_.clear();
+    damaged_region_.Reset(Rect());
 
   actor->UpdateProjection();
   VisitContainer(actor);
@@ -240,20 +242,19 @@ void LayerVisitor::VisitTexturePixmap(
     top_fullscreen_actor_ = actor;
 
   if (use_partial_updates_) {
-    BoundingBox region = MapRegionToGlCoordinates(
-        *stage_actor_,
-        *actor,
-        actor->GetDamagedRegion());
-    updated_area_.merge(region);
+    vector<Rect>::const_iterator iterator =
+        actor->GetDamagedRegion().rects().begin();
+    for (; iterator != actor->GetDamagedRegion().rects().end(); ++iterator) {
+      BoundingBox region = MapRegionToGlCoordinates(
+          *stage_actor_,
+          *actor,
+          *iterator);
+      damaged_region_.Unite(MapGlCoordinatesToClipRect(region,
+                                                       stage_actor_->width(),
+                                                       stage_actor_->height()));
+    }
   }
   actor->ResetDamagedRegion();
-}
-
-Rect LayerVisitor::GetDamagedRegion(int stage_width, int stage_height) {
-  if (use_partial_updates_)
-    return MapGlCoordinatesToClipRect(updated_area_, stage_width, stage_height);
-  else
-    return Rect();
 }
 
 }  // namespace window_manager

@@ -506,12 +506,12 @@ class RealCompositor : public Compositor {
       NOTIMPLEMENTED();
     }
     virtual void ClearAlphaMask() { NOTIMPLEMENTED(); }
-    virtual const Rect& GetDamagedRegion() const { return damaged_region_; }
+    virtual const Region& GetDamagedRegion() const { return damaged_region_; }
     virtual void MergeDamagedRegion(const Rect& region) {
-      damaged_region_.merge(region);
+      damaged_region_.Unite(region);
     }
     virtual void ResetDamagedRegion() {
-      damaged_region_.reset(0, 0, 0, 0);
+      damaged_region_.Reset(Rect());
     }
     // End Compositor::TexturePixmapActor methods.
 
@@ -524,9 +524,8 @@ class RealCompositor : public Compositor {
     // Is |pixmap_| opaque (i.e. it has a non-32-bit depth)?
     bool pixmap_is_opaque_;
 
-    // Rectangle bounding all not-yet-composited regions reported by Damage
-    // events.
-    Rect damaged_region_;
+    // All not-yet-composited regions reported by Damage events.
+    Region damaged_region_;
 
     DISALLOW_COPY_AND_ASSIGN(TexturePixmapActor);
   };

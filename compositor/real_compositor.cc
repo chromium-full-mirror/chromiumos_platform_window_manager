@@ -923,14 +923,13 @@ void RealCompositor::Draw() {
     default_stage_->Accept(&layer_visitor);
     UpdateTopFullscreenActor(layer_visitor.top_fullscreen_actor());
     force_notification_about_top_fullscreen_actor_ = false;
-    Rect damaged_region = layer_visitor.GetDamagedRegion(
-        default_stage_->width(), default_stage_->height());
+    const Region& damaged_region = layer_visitor.damaged_region();
 
     // It is possible to receive partially_dirty_ notifications for actors
     // that are covered or offscreen, in which case, the damaged_region_
     // will be empty, and we can only check that after the LayerVisitor has
     // traversed through the tree.
-    if ((!use_partial_updates || !damaged_region.empty()) &&
+    if ((!use_partial_updates || !damaged_region.IsEmpty()) &&
         should_draw_frame()) {
       PROFILER_MARKER_BEGIN(RealCompositor_Draw_Render);
       draw_visitor_->set_damaged_region(damaged_region);

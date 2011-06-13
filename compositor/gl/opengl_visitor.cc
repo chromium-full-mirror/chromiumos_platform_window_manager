@@ -459,9 +459,11 @@ void OpenGlDrawVisitor::DrawNeedle() {
   gl_interface_->Rotatef(num_frames_drawn_, 0.f, 0.f, 1.f);
   gl_interface_->Scalef(30, 3, 1.f);
   gl_interface_->Color4f(1.f, 0.f, 0.f, 0.8f);
-  gl_interface_->Scissor(damaged_region_.x, damaged_region_.y,
-                         damaged_region_.width, damaged_region_.height);
-  gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  vector<Rect>::const_iterator it = damaged_region_.rects().begin();
+  for (; it != damaged_region_.rects().end(); ++it) {
+    gl_interface_->Scissor((*it).x, (*it).y, (*it).width, (*it).height);
+    gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  }
   gl_interface_->PopMatrix();
   PROFILER_MARKER_END(DrawNeedle);
 }
@@ -487,7 +489,7 @@ void OpenGlDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
   state_cache_.Invalidate();
 
   const bool partial_update_possible =
-      gl_interface_->IsCapableOfPartialUpdates() && !damaged_region_.empty();
+      gl_interface_->IsCapableOfPartialUpdates() && !damaged_region_.IsEmpty();
 
   bool do_partial_update = false;
 
@@ -501,20 +503,22 @@ void OpenGlDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
     // implement eglSwapBuffers().  An improvement to this algorithm
     // could first attempt to detect whether buffer flipping is being
     // used by performing a series of swaps and readbacks.
-    if (damaged_region_.area() < half_stage_area)
+    if (damaged_region_.GetArea() < half_stage_area)
       do_partial_update = true;
   }
 
   if (!do_partial_update)
-    damaged_region_.reset(0, 0, actor->width(), actor->height());
+    damaged_region_.Reset(Rect(0, 0, actor->width(), actor->height()));
 
   gl_interface_->Enable(GL_SCISSOR_TEST);
 
   // No need to clear color buffer if something will cover up the screen.
   if (!has_fullscreen_actor_) {
-    gl_interface_->Scissor(damaged_region_.x, damaged_region_.y,
-                           damaged_region_.width, damaged_region_.height);
-    gl_interface_->Clear(GL_COLOR_BUFFER_BIT);
+    vector<Rect>::const_iterator it = damaged_region_.rects().begin();
+    for (; it != damaged_region_.rects().end(); ++it) {
+      gl_interface_->Scissor((*it).x, (*it).y, (*it).width, (*it).height);
+      gl_interface_->Clear(GL_COLOR_BUFFER_BIT);
+    }
   }
 
   using_passthrough_projection_ = actor->using_passthrough_projection();
@@ -550,18 +554,21 @@ void OpenGlDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
 
   PROFILER_MARKER_BEGIN(Swap_Buffer);
   if (do_partial_update) {
-    gl_interface_->CopyGlxSubBuffer(actor->GetStageXWindow(),
-                                    damaged_region_.x,
-                                    damaged_region_.y,
-                                    damaged_region_.width,
-                                    damaged_region_.height);
+    vector<Rect>::const_iterator it = damaged_region_.rects().begin();
+    for (; it != damaged_region_.rects().end(); ++it) {
+      gl_interface_->CopyGlxSubBuffer(actor->GetStageXWindow(),
+                                      (*it).x,
+                                      (*it).y,
+                                      (*it).width,
+                                      (*it).height);
 #ifdef EXTRA_LOGGING
-    DLOG(INFO) << "Partial updates: "
-               << damaged_region_.x << ", "
-               << damaged_region_.y << ", "
-               << damaged_region_.width << ", "
-               << damaged_region_.height << ".";
+      DLOG(INFO) << "Partial updates: "
+                 << (*it).x << ", "
+                 << (*it).y << ", "
+                 << (*it).width << ", "
+                 << (*it).height << ".";
 #endif
+    }
   } else {
     gl_interface_->SwapGlxBuffers(actor->GetStageXWindow());
 #ifdef EXTRA_LOGGING
@@ -777,12 +784,18 @@ void OpenGlDrawVisitor::VisitQuad(RealCompositor::QuadActor* actor) {
   // occlusion culled area.
   // TODO(reveman): Find the clip-rects/culled-area ratio where it becomes
   // more efficient to draw the bounding box.
-  vector<Rect>::const_iterator iterator = actor->clip().rects().begin();
-  for (; iterator != actor->clip().rects().end(); ++iterator) {
-    Rect region(*iterator);
-    region.intersect(damaged_region_);
-    gl_interface_->Scissor(region.x, region.y, region.width, region.height);
-    gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  vector<Rect>::const_iterator clip_it = actor->clip().rects().begin();
+  for (; clip_it != actor->clip().rects().end(); ++clip_it) {
+    vector<Rect>::const_iterator damage_it = damaged_region_.rects().begin();
+    for (; damage_it != damaged_region_.rects().end(); ++damage_it) {
+      Rect region(*clip_it);
+      region.intersect(*damage_it);
+      if (region.empty())
+        continue;
+
+      gl_interface_->Scissor(region.x, region.y, region.width, region.height);
+      gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
   }
   gl_interface_->PopMatrix();
   CHECK_GL_ERROR(gl_interface_);

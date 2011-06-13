@@ -59,7 +59,7 @@ class LayerVisitor : virtual public RealCompositor::ActorVisitor {
         stage_actor_(NULL),
         visiting_top_visible_actor_(true),
         top_fullscreen_actor_(NULL),
-        updated_area_(0.0f, 0.0f, 0.0f, 0.0f),
+        damaged_region_(Rect()),
         use_partial_updates_(use_partial_updates) {}
   virtual ~LayerVisitor() {}
 
@@ -80,7 +80,7 @@ class LayerVisitor : virtual public RealCompositor::ActorVisitor {
 
   // Get the damaged region in screen coordinates where (0, 0) is bottom_left
   // and (w-1, h-1) is top_right.
-  Rect GetDamagedRegion(int stage_width, int stage_height);
+  const Region& damaged_region() { return damaged_region_; }
 
  private:
   int32 count_;
@@ -102,9 +102,9 @@ class LayerVisitor : virtual public RealCompositor::ActorVisitor {
   const RealCompositor::TexturePixmapActor* top_fullscreen_actor_;
 
   // This restores the dirty region union of all actors from the most
-  // recent VisitStage.  It's defined in GL coordinates where (-1, -1) is
-  // bottom_left and (1, 1) is top_right.
-  BoundingBox updated_area_;
+  // recent VisitStage.  It's defined in screen coordinates where (0, 0)
+  // is bottom_left and (w-1, h-1) is top_right.
+  Region damaged_region_;
 
   bool use_partial_updates_;
 

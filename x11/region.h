@@ -7,6 +7,8 @@
 
 #include <vector>
 
+#include <stdint.h>
+
 #include "window_manager/geometry.h"
 
 typedef struct _XRegion REGION;
@@ -24,6 +26,7 @@ class Region {
   const std::vector<Rect>& rects() const { return rects_; }
 
   Rect GetBounds() const;
+  uint32_t GetArea() const;
 
   void Reset(const Region& region);
   void Reset(const Rect& rect) { Reset(Region(rect)); }

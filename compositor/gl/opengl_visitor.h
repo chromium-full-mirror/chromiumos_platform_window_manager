@@ -80,8 +80,8 @@ class OpenGlDrawVisitor : virtual public RealCompositor::ActorVisitor {
   void set_has_fullscreen_actor(bool has_fullscreen_actor) {
     has_fullscreen_actor_ = has_fullscreen_actor;
   }
-  void set_damaged_region(const Rect& damaged_region) {
-    damaged_region_ = damaged_region;
+  void set_damaged_region(const Region& damaged_region) {
+    damaged_region_.Reset(damaged_region);
   }
 
   void BindImage(const ImageContainer& container,
@@ -176,9 +176,9 @@ class OpenGlDrawVisitor : virtual public RealCompositor::ActorVisitor {
   // state changes.
   OpenGlStateCache state_cache_;
 
-  // The rectangular region of the screen that is damaged in the frame.
+  // The region of the screen that is damaged in the frame.
   // This information allows the draw visitor to perform partial updates.
-  Rect damaged_region_;
+  Region damaged_region_;
 
   // Used to track whether the current projection matrix is a pass-through
   // matrix.  Pass-through means the output of the model view transform will

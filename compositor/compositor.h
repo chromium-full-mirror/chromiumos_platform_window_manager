@@ -12,6 +12,7 @@
 #include "window_manager/compositor/animation.h"
 #include "window_manager/geometry.h"
 #include "window_manager/image_enums.h"
+#include "window_manager/x11/region.h"
 #include "window_manager/x11/x_types.h"
 
 namespace window_manager {
@@ -193,7 +194,7 @@ class Compositor {
 
     // Get the currently damaged region; if (width, height) is (0, 0), then
     // the content is not dirty.
-    virtual const Rect& GetDamagedRegion() const = 0;
+    virtual const Region& GetDamagedRegion() const = 0;
 
     // Clear the previously set damaged region, i.e., set (width, height)
     // to (0, 0).

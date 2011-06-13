@@ -36,8 +36,8 @@ class OpenGlesDrawVisitor : virtual public RealCompositor::ActorVisitor {
   void set_has_fullscreen_actor(bool has_fullscreen_actor) {
     has_fullscreen_actor_ = has_fullscreen_actor;
   }
-  void set_damaged_region(const Rect& damaged_region) {
-    damaged_region_ = damaged_region;
+  void set_damaged_region(const Region& damaged_region) {
+      damaged_region_ = damaged_region.GetBounds();
   }
 
   void BindImage(const ImageContainer& container,

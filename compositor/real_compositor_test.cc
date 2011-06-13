@@ -585,8 +585,8 @@ TEST_F(RealCompositorTest, PartialUpdates) {
   Draw();
   EXPECT_FALSE(compositor_->dirty());
   ++full_updates_count;
-  EXPECT_EQ(gl_->full_updates_count(), full_updates_count);
-  EXPECT_EQ(gl_->partial_updates_count(), partial_updates_count);
+  EXPECT_EQ(full_updates_count, gl_->full_updates_count());
+  EXPECT_EQ(partial_updates_count, gl_->partial_updates_count());
 
   // Mark part of the window as dirty. The next time we draw, partial updates
   // should happen.
@@ -598,8 +598,8 @@ TEST_F(RealCompositorTest, PartialUpdates) {
   Draw();
   ++partial_updates_count;
   EXPECT_FALSE(compositor_->dirty());
-  EXPECT_EQ(gl_->full_updates_count(), full_updates_count);
-  EXPECT_EQ(gl_->partial_updates_count(), partial_updates_count);
+  EXPECT_EQ(full_updates_count, gl_->full_updates_count());
+  EXPECT_EQ(partial_updates_count, gl_->partial_updates_count());
   const Rect& updated_region = gl_->partial_updates_region();
   // Damaged region is defined relative to the window where (0, 0) is top_left
   // and (w, h) is bottom_right.  CopyGlxSubBuffer's region is defined relative
@@ -614,6 +614,19 @@ TEST_F(RealCompositorTest, PartialUpdates) {
   EXPECT_GE(expected_min_y, updated_region.y);
   EXPECT_LE(expected_max_x, updated_region.x + updated_region.width);
   EXPECT_LE(expected_max_y, updated_region.y + updated_region.height);
+
+  // Mark two separate parts of the window as dirty. The next time we draw,
+  // two partial updates should happen.
+  EXPECT_TRUE(gl_->IsCapableOfPartialUpdates());
+  cast_actor->MergeDamagedRegion(Rect(44, 28, 12, 13));
+  cast_actor->MergeDamagedRegion(Rect(144, 128, 12, 13));
+  compositor_->SetPartiallyDirty();
+  EXPECT_FALSE(compositor_->dirty());
+  Draw();
+  partial_updates_count += 2;
+  EXPECT_FALSE(compositor_->dirty());
+  EXPECT_EQ(full_updates_count, gl_->full_updates_count());
+  EXPECT_EQ(partial_updates_count, gl_->partial_updates_count());
 }
 
 // Test LayerVisitor's top fullscreen window.

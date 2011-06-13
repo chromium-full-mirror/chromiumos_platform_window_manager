@@ -37,6 +37,16 @@ Rect Region::GetBounds() const {
   return Rect(x_rect.x, x_rect.y, x_rect.width, x_rect.height);
 }
 
+uint32_t Region::GetArea() const {
+  std::vector<Rect>::const_iterator it = rects_.begin();
+  uint32_t area = 0;
+
+  for (; it != rects_.end(); ++it)
+    area += (*it).area();
+
+  return area;
+}
+
 void Region::Reset(const Region& region) {
   Region empty;
   XSubtractRegion(region.region_, empty.region_, region_);
