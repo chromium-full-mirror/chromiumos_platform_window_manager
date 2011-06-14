@@ -961,6 +961,22 @@ void LayoutManager2::CycleActiveBrowserWindow(bool forward) {
   if (browser_windows_.empty())
     return;
 
+  if (wm_->key_bindings()->current_event_time()) {
+    const KeyBindings::KeyCombo& combo =
+        wm_->key_bindings()->current_key_combo();
+    if (forward) {
+      if (combo.keysym == XK_Tab)
+        wm_->ReportUserAction("Accel_NextWindow_Tab");
+      else if (combo.keysym == XK_F5)
+        wm_->ReportUserAction("Accel_NextWindow_F5");
+    } else {
+      if (combo.keysym == XK_Tab)
+        wm_->ReportUserAction("Accel_PrevWindow_Tab");
+      else if (combo.keysym == XK_F5)
+        wm_->ReportUserAction("Accel_PrevWindow_F5");
+    }
+  }
+
   if (num_browser_windows() == 1) {
     BrowserWindow* active_browser = GetActiveBrowserWindow();
     DCHECK(active_browser);
