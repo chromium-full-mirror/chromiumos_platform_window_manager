@@ -22,10 +22,28 @@ DEFINE_bool(kill_chrome_if_hanging, false,
 
 using chromeos::WmIpcMessageType;
 using window_manager::util::GetHostname;
+using window_manager::util::GetMonotonicTime;
+
+namespace {
+
+const int kSignalToSend = SIGABRT;
+
+const char kHistogramName[] = "WindowManager.ChromePingResponseTime";
+
+// What histogram sample should we report when we kill Chrome?
+// This must be higher than the timeout passed to SendPingToChrome().
+const int kKillHistogramSampleMs = 60000;
+
+// Minimum and maximum sample values that will be recorded in the histogram.
+const int kMinHistogramSampleMs = 0;
+const int kMaxHistogramSampleMs = kKillHistogramSampleMs;
+
+// Number of histogram buckets (as recommended by metrics_library.h).
+const int kNumHistogramBuckets = 50;
+
+}  // namespace
 
 namespace window_manager {
-
-static const int kSignalToSend = SIGABRT;
 
 ChromeWatchdog::ChromeWatchdog(WindowManager* wm)
     : wm_(wm),
@@ -71,6 +89,14 @@ void ChromeWatchdog::HandleClientMessage(XWindow xid,
     return;
   }
 
+  const int elapsed_ms = static_cast<int>(
+      (GetMonotonicTime() - monotonic_time_from_last_ping_).InMilliseconds());
+  wm_->ReportHistogramSample(
+      kHistogramName,
+      elapsed_ms,
+      kMinHistogramSampleMs, kMaxHistogramSampleMs,
+      kNumHistogramBuckets);
+
   AbortTimeout();
 }
 
@@ -95,6 +121,7 @@ bool ChromeWatchdog::SendPingToChrome(XTime timestamp, int timeout_ms) {
 
   pinged_chrome_xid_ = xid;
   ping_timestamp_ = timestamp;
+  monotonic_time_from_last_ping_ = GetMonotonicTime();
   registrar_->RegisterForWindowEvents(wm_->root());
   return true;
 }
@@ -115,6 +142,12 @@ void ChromeWatchdog::HandleTimeout() {
   DCHECK(pinged_chrome_xid_);
   Window* win = wm_->GetWindowOrDie(pinged_chrome_xid_);
   AbortTimeout();
+
+  wm_->ReportHistogramSample(
+      kHistogramName,
+      kKillHistogramSampleMs,
+      kMinHistogramSampleMs, kMaxHistogramSampleMs,
+      kNumHistogramBuckets);
 
   pid_t chrome_pid = static_cast<pid_t>(win->client_pid());
   LOG(INFO) << "Chrome window " << win->xid_str() << " didn't respond to ping; "

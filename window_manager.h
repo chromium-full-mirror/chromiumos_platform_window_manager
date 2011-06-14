@@ -287,6 +287,15 @@ class WindowManager : public PanelManagerAreaChangeListener,
   // Does nothing if metrics reporting is disabled.
   void ReportUserAction(const std::string& action);
 
+  // Send a histogram sample to Chrome so it can send it to UMA.
+  // See metrics_library.h in metrics.git for more details.
+  // Does nothing if metrics reporting is disabled.
+  void ReportHistogramSample(const std::string& histogram_name,
+                             int sample,
+                             int min_value,
+                             int max_value,
+                             int num_buckets);
+
   // Increment or decrement a counter tracking compositing requests.  When it's
   // greater than zero, we force compositing.  If we're not already compositing,
   // IncrementCompositingRequests() will force us to draw a composited frame

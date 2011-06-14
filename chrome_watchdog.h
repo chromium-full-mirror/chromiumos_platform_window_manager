@@ -12,6 +12,7 @@
 #include <gtest/gtest_prod.h>  // for FRIEND_TEST() macro
 
 #include "base/memory/scoped_ptr.h"
+#include "base/time.h"
 #include "window_manager/event_consumer.h"
 #include "window_manager/x11/x_types.h"
 
@@ -105,9 +106,12 @@ class ChromeWatchdog : public EventConsumer {
   // we're not currently waiting for a reply.
   XWindow pinged_chrome_xid_;
 
-  // Timestamp in the last ping that we sent.  We expect to receive this in
+  // X timestamp in the last ping that we sent.  We expect to receive this in
   // the reply.
   XTime ping_timestamp_;
+
+  // Time at which we sent the last ping (used for metrics).
+  base::TimeTicks monotonic_time_from_last_ping_;
 
   // ID of the timeout that will run HandleTimeout(), or -1 if no timeout
   // is currently registered.

@@ -101,8 +101,8 @@ static const int kUnacceleratedGraphicsActorHideAnimMs = 500;
 
 // How frequently should we send _NET_WM_PING messages to Chrome, and how
 // long should we wait for a response to each before killing the process?
-static const int kPingChromeFrequencyMs = 5000;
-static const int kPingChromeTimeoutMs = 4000;
+static const int kPingChromeFrequencyMs = 30000;
+static const int kPingChromeTimeoutMs = 20000;
 COMPILE_ASSERT(kPingChromeFrequencyMs > kPingChromeTimeoutMs,
                ping_timeout_is_greater_than_ping_frequency);
 
@@ -939,6 +939,16 @@ void WindowManager::DestroyLoginController() {
 void WindowManager::ReportUserAction(const string& action) {
   if (metrics_library_.get())
     metrics_library_->SendUserActionToUMA(action);
+}
+
+void WindowManager::ReportHistogramSample(const std::string& histogram_name,
+                                          int sample,
+                                          int min_value,
+                                          int max_value,
+                                          int num_buckets) {
+  if (metrics_library_.get())
+    metrics_library_->SendToUMA(
+        histogram_name, sample, min_value, max_value, num_buckets);
 }
 
 void WindowManager::IncrementCompositingRequests() {
