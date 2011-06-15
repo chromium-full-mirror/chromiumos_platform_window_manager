@@ -57,7 +57,7 @@ StackingManager::~StackingManager() {
 }
 
 void StackingManager::StackWindowAtTopOfLayer(
-    Window* win, Layer layer, ShadowPolicy shadow_policy) {
+    Window* win, Layer layer, ShadowPolicy shadow_policy, Layer shadow_layer) {
   DCHECK(win);
   DLOG(INFO) << "Stacking window " << win->xid_str() << " at top of "
              << LayerToName(layer) << " layer";
@@ -68,12 +68,14 @@ void StackingManager::StackWindowAtTopOfLayer(
   Compositor::Actor* layer_actor = GetActorForLayer(layer);
 
   Compositor::Actor* lower_layer_actor = NULL;
-  // Find the next-lowest layer so we can stack the window's shadow
-  // directly above it.
-  // TODO: This won't work for the bottom layer; write additional code to
-  // handle it if it ever becomes necessary.
-  if (shadow_policy == SHADOW_AT_BOTTOM_OF_LAYER)
-    lower_layer_actor = GetActorForLayer(static_cast<Layer>(layer + 1));
+  if (shadow_policy == SHADOW_AT_BOTTOM_OF_SHADOW_LAYER) {
+    DCHECK_LE(layer, shadow_layer) << "xid=" << win->xid_str();
+    // Find the next-lowest layer so we can stack the window's shadow directly
+    // above it.
+    // TODO: This won't work for the bottom layer; write additional code to
+    // handle it if it ever becomes necessary.
+    lower_layer_actor = GetActorForLayer(static_cast<Layer>(shadow_layer + 1));
+  }
   win->StackCompositedBelow(layer_actor, lower_layer_actor, true);
 
   XWindow layer_xid = GetXidForLayer(layer);
@@ -110,7 +112,7 @@ void StackingManager::StackWindowRelativeToOtherWindow(
              << " window " << sibling->xid_str();
 
   Compositor::Actor* lower_layer_actor = NULL;
-  if (shadow_policy == SHADOW_AT_BOTTOM_OF_LAYER)
+  if (shadow_policy == SHADOW_AT_BOTTOM_OF_SHADOW_LAYER)
     lower_layer_actor = GetActorForLayer(static_cast<Layer>(shadow_layer + 1));
 
   switch (sibling_policy) {
@@ -124,7 +126,7 @@ void StackingManager::StackWindowRelativeToOtherWindow(
       // that |sibling|'s shadow was also stacked there and stack |win| directly
       // under |sibling| instead of under its shadow.
       Compositor::Actor* sibling_actor =
-          shadow_policy == SHADOW_AT_BOTTOM_OF_LAYER ?
+          shadow_policy == SHADOW_AT_BOTTOM_OF_SHADOW_LAYER ?
           sibling->actor() :
           sibling->GetBottomActor();
       win->StackCompositedBelow(sibling_actor, lower_layer_actor, true);

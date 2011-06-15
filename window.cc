@@ -135,7 +135,8 @@ Window::Window(WindowManager* wm,
     wm_->stacking_manager()->StackWindowAtTopOfLayer(
         this,
         StackingManager::LAYER_TOP_CLIENT_WINDOW,
-        StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR);
+        StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
+        StackingManager::LAYER_TOP_CLIENT_WINDOW);
   } else {
     wm_->stacking_manager()->StackActorAtTopOfLayer(
         actor_.get(),

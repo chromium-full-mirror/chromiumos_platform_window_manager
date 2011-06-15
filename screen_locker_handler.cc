@@ -116,7 +116,8 @@ bool ScreenLockerHandler::HandleWindowMapRequest(Window* win) {
   wm_->stacking_manager()->StackWindowAtTopOfLayer(
       win,
       StackingManager::LAYER_SCREEN_LOCKER,
-      StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR);
+      StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
+      StackingManager::LAYER_SCREEN_LOCKER);
   return true;
 }
 

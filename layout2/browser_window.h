@@ -57,10 +57,14 @@ class BrowserWindow {
   void SetBounds(const Rect& bounds, int anim_ms);
 
   // Stack the window at the top of |layer|.
-  void StackAtTopOfLayer(StackingManager::Layer layer);
+  void StackAtTopOfLayer(StackingManager::Layer layer,
+                         StackingManager::ShadowPolicy shadow_policy,
+                         StackingManager::Layer shadow_layer);
 
   // Stack the window directly beneath |other_browser|.
-  void StackBelowOtherBrowserWindow(BrowserWindow* other_browser);
+  void StackBelowOtherBrowserWindow(BrowserWindow* other_browser,
+                                    StackingManager::ShadowPolicy shadow_policy,
+                                    StackingManager::Layer shadow_layer);
 
   // Assign the input focus to |win_| or one of its transient windows.
   void TakeFocus(XTime timestamp);

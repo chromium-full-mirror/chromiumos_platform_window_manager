@@ -107,13 +107,13 @@ class StackingManager {
 
   // Policies for stacking a window's shadow.
   enum ShadowPolicy {
-    // Stack the shadow at the bottom of the window's layer.
-    // This can be useful for preventing a window's shadow from falling on its
-    // siblings -- imagine the case of two stationary panels located a pixel
-    // apart.
-    SHADOW_AT_BOTTOM_OF_LAYER = 0,
+    // Stack the shadow at the bottom of layer specified by the |shadow_layer|
+    // parameter.  This can be useful for preventing a window's shadow from
+    // falling on its siblings -- imagine the case of two panels in the same
+    // layer that are located a pixel apart.
+    SHADOW_AT_BOTTOM_OF_SHADOW_LAYER = 0,
 
-    // Stack the shadow directly below the window.
+    // Stack the shadow directly below |win|'s actor.
     SHADOW_DIRECTLY_BELOW_ACTOR,
   };
 
@@ -132,8 +132,13 @@ class StackingManager {
 
   // Stack a window (both its X window and its compositor actor) at the top
   // of the passed-in layer, which must be LAYER_TOP_CLIENT_WINDOW or below.
+  // |shadow_layer| is only honored if |shadow_policy| is
+  // SHADOW_AT_BOTTOM_OF_SHADOW_LAYER.
   void StackWindowAtTopOfLayer(
-      Window* win, Layer layer, ShadowPolicy shadow_policy);
+      Window* win,
+      Layer layer,
+      ShadowPolicy shadow_policy,
+      Layer shadow_layer);
 
   // Stack an X window at the top of the passed-in layer, which must be
   // LAYER_TOP_CLIENT_WINDOW or below.  This is useful for X windows that don't
@@ -144,8 +149,7 @@ class StackingManager {
   void StackActorAtTopOfLayer(Compositor::Actor* actor, Layer layer);
 
   // Stack a window's client and composited windows directly above or below
-  // another window.  Make sure that |sibling| is in |layer| if using
-  // SHADOW_AT_BOTTOM_OF_LAYER -- things will get confusing otherwise.
+  // another window.
   void StackWindowRelativeToOtherWindow(
       Window* win,
       Window* sibling,

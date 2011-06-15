@@ -14,6 +14,7 @@
 #include "cros/chromeos_wm_ipc_enums.h"
 #include "window_manager/layout2/layout_manager2.h"
 #include "window_manager/panels/panel.h"
+#include "window_manager/shadow.h"
 #include "window_manager/stacking_manager.h"
 #include "window_manager/test_lib.h"
 #include "window_manager/window.h"
@@ -456,6 +457,31 @@ TEST_F(LayoutManager2Test, LegacyResizeScreen) {
   xconn_->InitConfigureNotifyEvent(&event, xid);
   wm_->HandleEvent(&event);
   EXPECT_EQ(kNewRootBounds, GetCompositedWindowBounds(xid));
+}
+
+TEST_F(LayoutManager2Test, LegacyStackShadowsAtBottomOfLayer) {
+  AutoReset<bool> multiple_windows_flag_resetter(
+      &FLAGS_multiple_windows, false);
+  CreateAndInitNewWm();
+
+  // Map two windows.  The second should be focused.
+  XWindow xid = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid);
+  Window* win = wm_->GetWindowOrDie(xid);
+  XWindow xid2 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid2);
+  Window* win2 = wm_->GetWindowOrDie(xid2);
+  ASSERT_EQ(xid2, xconn_->focused_xid());
+
+  // The first window should be stacked under the second (focused) window, but
+  // both windows' shadows should be under the first window.
+  MockCompositor::StageActor* stage = compositor_->GetDefaultStage();
+  EXPECT_LT(stage->GetStackingIndex(win2->actor()),
+            stage->GetStackingIndex(win->actor()));
+  EXPECT_LT(stage->GetStackingIndex(win->actor()),
+            stage->GetStackingIndex(win->shadow()->group()));
+  EXPECT_LT(stage->GetStackingIndex(win->actor()),
+            stage->GetStackingIndex(win2->shadow()->group()));
 }
 
 // Test that the layout manager handles windows that claim to be transient

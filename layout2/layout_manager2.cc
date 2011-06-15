@@ -806,12 +806,21 @@ void LayoutManager2::RestackBrowserWindows(
 
   if (fullscreen_browser_)
     fullscreen_browser_->StackAtTopOfLayer(
+        StackingManager::LAYER_FULLSCREEN_WINDOW,
+        StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
         StackingManager::LAYER_FULLSCREEN_WINDOW);
+
+  StackingManager::ShadowPolicy shadow_policy =
+      maximized_ ?
+      StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER :
+      StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR;
 
   BrowserWindow* active_browser = GetActiveBrowserWindow();
   if (active_browser != fullscreen_browser_)
     active_browser->StackAtTopOfLayer(
-        StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
+        StackingManager::LAYER_ACTIVE_BROWSER_WINDOW,
+        shadow_policy,
+        StackingManager::LAYER_INACTIVE_BROWSER_WINDOW);
 
   BrowserWindow* secondary_browser =
       secondary_browser_index != -1 ?
@@ -819,6 +828,8 @@ void LayoutManager2::RestackBrowserWindows(
       NULL;
   if (secondary_browser && secondary_browser != fullscreen_browser_)
     secondary_browser->StackAtTopOfLayer(
+        StackingManager::LAYER_INACTIVE_BROWSER_WINDOW,
+        shadow_policy,
         StackingManager::LAYER_INACTIVE_BROWSER_WINDOW);
 
   BrowserWindow* prev_browser = secondary_browser;
@@ -828,9 +839,14 @@ void LayoutManager2::RestackBrowserWindows(
       if (browser == fullscreen_browser_)
         continue;
       if (prev_browser)
-        browser->StackBelowOtherBrowserWindow(prev_browser);
+        browser->StackBelowOtherBrowserWindow(
+            prev_browser,
+            shadow_policy,
+            StackingManager::LAYER_INACTIVE_BROWSER_WINDOW);
       else
         browser->StackAtTopOfLayer(
+            StackingManager::LAYER_INACTIVE_BROWSER_WINDOW,
+            shadow_policy,
             StackingManager::LAYER_INACTIVE_BROWSER_WINDOW);
       prev_browser = browser;
     }
@@ -843,9 +859,14 @@ void LayoutManager2::RestackBrowserWindows(
       if (browser == fullscreen_browser_)
         continue;
       if (prev_browser)
-        browser->StackBelowOtherBrowserWindow(prev_browser);
+        browser->StackBelowOtherBrowserWindow(
+            prev_browser,
+            shadow_policy,
+            StackingManager::LAYER_INACTIVE_BROWSER_WINDOW);
       else
         browser->StackAtTopOfLayer(
+            StackingManager::LAYER_INACTIVE_BROWSER_WINDOW,
+            shadow_policy,
             StackingManager::LAYER_INACTIVE_BROWSER_WINDOW);
       prev_browser = browser;
     }

@@ -418,23 +418,28 @@ void LoginEntry::StackWindows() {
   wm_->stacking_manager()->StackWindowAtTopOfLayer(
       border_window_,
       StackingManager::LAYER_LOGIN_WINDOW,
-      StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+      StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+      StackingManager::LAYER_LOGIN_WINDOW);
   wm_->stacking_manager()->StackWindowAtTopOfLayer(
       image_window_,
       StackingManager::LAYER_LOGIN_WINDOW,
-      StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+      StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+      StackingManager::LAYER_LOGIN_WINDOW);
   wm_->stacking_manager()->StackWindowAtTopOfLayer(
       unselected_label_window_,
       StackingManager::LAYER_LOGIN_WINDOW,
-      StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+      StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+      StackingManager::LAYER_LOGIN_WINDOW);
   wm_->stacking_manager()->StackWindowAtTopOfLayer(
       label_window_,
       StackingManager::LAYER_LOGIN_WINDOW,
-      StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+      StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+      StackingManager::LAYER_LOGIN_WINDOW);
   wm_->stacking_manager()->StackWindowAtTopOfLayer(
       controls_window_,
       StackingManager::LAYER_LOGIN_WINDOW,
-      StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+      StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+      StackingManager::LAYER_LOGIN_WINDOW);
 }
 
 }  // namespace window_manager

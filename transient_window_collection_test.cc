@@ -32,7 +32,8 @@ TEST_F(TransientWindowCollectionTest, Stacking) {
   wm_->stacking_manager()->StackWindowAtTopOfLayer(
       &owner_win,
       StackingManager::LAYER_FULLSCREEN_WINDOW,
-      StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+      StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+      StackingManager::LAYER_FULLSCREEN_WINDOW);
 
   TestEventConsumer event_consumer;
   TransientWindowCollection transients(

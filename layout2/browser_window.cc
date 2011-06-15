@@ -102,9 +102,12 @@ void BrowserWindow::SetBounds(const Rect& bounds, int anim_ms) {
   transients_->ConfigureAllWindowsRelativeToOwner(anim_ms);
 }
 
-void BrowserWindow::StackAtTopOfLayer(StackingManager::Layer layer) {
+void BrowserWindow::StackAtTopOfLayer(
+    StackingManager::Layer layer,
+    StackingManager::ShadowPolicy shadow_policy,
+    StackingManager::Layer shadow_layer) {
   wm()->stacking_manager()->StackWindowAtTopOfLayer(
-      win_, layer, StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR);
+      win_, layer, shadow_policy, shadow_layer);
   wm()->stacking_manager()->StackActorRelativeToOtherActor(
       dimming_box_.get(),
       win_->GetTopActor(),
@@ -117,7 +120,10 @@ void BrowserWindow::StackAtTopOfLayer(StackingManager::Layer layer) {
   transients_->ApplyStackingForAllWindows();
 }
 
-void BrowserWindow::StackBelowOtherBrowserWindow(BrowserWindow* other_browser) {
+void BrowserWindow::StackBelowOtherBrowserWindow(
+    BrowserWindow* other_browser,
+    StackingManager::ShadowPolicy shadow_policy,
+    StackingManager::Layer shadow_layer) {
   DCHECK(other_browser);
   // The layer that we pass here is irrelevant since we're stacking our shadow
   // directly below our actor rather than at the bottom of the layer.
@@ -125,8 +131,8 @@ void BrowserWindow::StackBelowOtherBrowserWindow(BrowserWindow* other_browser) {
       win_,
       other_browser->win(),
       StackingManager::BELOW_SIBLING,
-      StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
-      StackingManager::LAYER_INACTIVE_BROWSER_WINDOW);
+      shadow_policy,
+      shadow_layer);
   wm()->stacking_manager()->StackActorRelativeToOtherActor(
       dimming_box_.get(),
       win_->GetTopActor(),

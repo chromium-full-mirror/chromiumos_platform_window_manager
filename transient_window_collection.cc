@@ -346,7 +346,8 @@ void TransientWindowCollection::ApplyStackingForTransientWindow(
     wm()->stacking_manager()->StackWindowAtTopOfLayer(
         transient->win,
         StackingManager::LAYER_ACTIVE_TRANSIENT_WINDOW,
-        StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR);
+        StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
+        StackingManager::LAYER_ACTIVE_TRANSIENT_WINDOW);
   }
 }
 

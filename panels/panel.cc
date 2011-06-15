@@ -424,11 +424,13 @@ void Panel::StackAtTopOfLayer(StackingManager::Layer layer) {
     wm()->stacking_manager()->StackWindowAtTopOfLayer(
         content_win_,
         layer,
-        StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+        StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+        layer);
     wm()->stacking_manager()->StackWindowAtTopOfLayer(
         titlebar_win_,
         layer,
-        StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+        StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+        layer);
     separator_shadow_->group()->Raise(content_win_->actor());
     StackInputWindows();
   }
@@ -519,7 +521,8 @@ void Panel::SetFullscreenState(bool fullscreen) {
     wm()->stacking_manager()->StackWindowAtTopOfLayer(
         content_win_,
         StackingManager::LAYER_FULLSCREEN_WINDOW,
-        StackingManager::SHADOW_AT_BOTTOM_OF_LAYER);
+        StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER,
+        StackingManager::LAYER_FULLSCREEN_WINDOW);
     content_win_->Move(Point(0, 0), 0);
     content_win_->Resize(wm()->root_size(), GRAVITY_NORTHWEST);
     if (!content_win_->IsFocused()) {
