@@ -52,6 +52,7 @@ class BrowserWindow {
   void set_unmaximized_anchoring(AnchorPosition anchoring) {
     unmaximized_anchoring_ = anchoring;
   }
+  double brightness() const { return brightness_; }
 
   // Move and resize the window to |bounds| over |anim_ms| milliseconds.
   void SetBounds(const Rect& bounds, int anim_ms);
@@ -92,8 +93,9 @@ class BrowserWindow {
   // Used when the user tries to cycle windows while only one window is present.
   void DoNudgeAnimation(bool move_to_left);
 
-  // Dim or undim the window.
-  void SetDimmed(bool dimmed, int anim_ms);
+  // Set a window's brightness.  |brightness|'s range is [0.0, 1.0].  At 1, the
+  // window is displayed unmodified; at 0, it's completely black.
+  void SetBrightness(double brightness, int anim_ms);
 
   // Show or hide this window's status area.
   void SetStatusAreaDisplayed(bool displayed);
@@ -118,11 +120,13 @@ class BrowserWindow {
   // Is this window currently displaying its status area?
   bool status_area_displayed_;
 
+  // Most-recently-set brightness for the window.
+  double brightness_;
+
   // Transient windows belonging to this window.
   scoped_ptr<TransientWindowCollection> transients_;
 
-  // Actor displayed above the window when it's at the edge of the screen to dim
-  // it.
+  // Actor displayed above the window to control its brightness.
   scoped_ptr<Compositor::ColoredBoxActor> dimming_box_;
 
   DISALLOW_COPY_AND_ASSIGN(BrowserWindow);

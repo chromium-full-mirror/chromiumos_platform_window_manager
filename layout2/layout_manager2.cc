@@ -83,6 +83,9 @@ const int kResizeHandleWidthPixels = 12;
 // Opacity of the box that we display while the user is resizing a window.
 const double kResizeBoxOpacity = 0.4;
 
+// Duration over which we dim the secondary browser window, in milliseconds.
+const double kSecondaryBrowserWindowDimAnimMs = 10000;
+
 // Key binding action names.
 const char kActivateBrowserByIndexActionFormat[] = "activate-browser-%d";
 const char kCycleBackwardAction[] = "cycle-browser-backward";
@@ -97,6 +100,8 @@ const char kToggleMaximizedAction[] = "toggle-browser-maximized";
 // Static members (non-anonymous so they can be used by tests).
 const int LayoutManager2::kWindowInitialWidthPixels = 1024;
 const int LayoutManager2::kEdgeGapPixels = 32;
+const double LayoutManager2::kEdgeBrowserWindowBrightness = 0.6;
+const double LayoutManager2::kSecondaryBrowserWindowBrightness = 0.9;
 
 LayoutManager2::LayoutManager2(WindowManager* wm)
     : wm_(wm),
@@ -878,7 +883,7 @@ void LayoutManager2::ArrangeBrowserWindows(
   if (fullscreen_browser_) {
     fullscreen_browser_->SetStatusAreaDisplayed(true);
     fullscreen_browser_->SetBounds(wm_->root_bounds(), 0);
-    fullscreen_browser_->SetDimmed(false, 0);
+    fullscreen_browser_->SetBrightness(1.0, 0);
     fullscreen_browser_->SetTransientWindowVisibility(true);
     if (focus_policy == ASSIGN_FOCUS_DURING_ARRANGE)
       fullscreen_browser_->TakeFocus(timestamp);
@@ -928,8 +933,20 @@ void LayoutManager2::ArrangeBrowserWindows(
     browser->SetMaximizedProperty(maximized_);
     browser->SetBounds(bounds[i], anim_ms);
 
-    const bool should_dim = offscreen && !maximized_;
-    browser->SetDimmed(should_dim, should_dim ? anim_ms : 0);
+    double brightness = 1.0;
+    int brightness_anim_ms = anim_ms;
+
+    if (i == active_browser_index_) {
+      brightness_anim_ms = 0;
+    } else if (i == secondary_browser_index) {
+      brightness = kSecondaryBrowserWindowBrightness;
+      if (browser->brightness() == 1.0)
+        brightness_anim_ms = kSecondaryBrowserWindowDimAnimMs;
+    } else if (!maximized_ && offscreen) {
+      brightness = kEdgeBrowserWindowBrightness;
+    }
+
+    browser->SetBrightness(brightness, brightness_anim_ms);
   }
 
   ConfigureResizeHandle();

@@ -121,6 +121,12 @@ class LayoutManager2 : public EventConsumer,
   // window to be visible?
   static const int kEdgeGapPixels;
 
+  // Brightness for the secondary browser window when in non-maximized mode.
+  static const double kSecondaryBrowserWindowBrightness;
+
+  // Brightness for browser windows shown at the edges of the screen.
+  static const double kEdgeBrowserWindowBrightness;
+
   bool should_maximize_new_browser() const {
     return maximized_ && num_browser_windows() != 1;
   }

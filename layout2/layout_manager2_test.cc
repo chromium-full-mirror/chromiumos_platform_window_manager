@@ -662,6 +662,9 @@ TEST_F(LayoutManager2Test, MultipleWindowLayout) {
   const int kInitialWidth = layout_manager()->GetInitialUnmaximizedWidth();
   const int kGap = LayoutManager2::kEdgeGapPixels;
   const Rect kRootBounds = xconn_->root_bounds();
+  const double kSecondaryBrightness =
+      LayoutManager2::kSecondaryBrowserWindowBrightness;
+  const double kEdgeBrightness = LayoutManager2::kEdgeBrowserWindowBrightness;
 
   // Initially, the fourth window should be focused on the right, with the third
   // window visible on the left and a strip of the second window visible at the
@@ -698,6 +701,11 @@ TEST_F(LayoutManager2Test, MultipleWindowLayout) {
   EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser4->win(), browser3->win()));
   EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser3->win(), browser2->win()));
   EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser2->win(), browser1->win()));
+
+  EXPECT_DOUBLE_EQ(kEdgeBrightness, browser1->brightness());
+  EXPECT_DOUBLE_EQ(kEdgeBrightness, browser2->brightness());
+  EXPECT_DOUBLE_EQ(kSecondaryBrightness, browser3->brightness());
+  EXPECT_DOUBLE_EQ(1.0, browser4->brightness());
 
   // Switch back to the second window, which should result in it being focused
   // on the left, the third window being focused on the right, and strips of the
@@ -738,6 +746,11 @@ TEST_F(LayoutManager2Test, MultipleWindowLayout) {
   EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser2->win(), browser1->win()));
   // The relative stacking of the first and fourth browsers isn't important.
 
+  EXPECT_DOUBLE_EQ(kEdgeBrightness, browser1->brightness());
+  EXPECT_DOUBLE_EQ(1.0, browser2->brightness());
+  EXPECT_DOUBLE_EQ(kSecondaryBrightness, browser3->brightness());
+  EXPECT_DOUBLE_EQ(kEdgeBrightness, browser4->brightness());
+
   // Finally, switch to the first window.
   // +-------+-----+-+
   // |       |     | |
@@ -772,6 +785,11 @@ TEST_F(LayoutManager2Test, MultipleWindowLayout) {
   EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser1->win(), browser2->win()));
   EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser2->win(), browser3->win()));
   EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser3->win(), browser4->win()));
+
+  EXPECT_DOUBLE_EQ(1.0, browser1->brightness());
+  EXPECT_DOUBLE_EQ(kSecondaryBrightness, browser2->brightness());
+  EXPECT_DOUBLE_EQ(kEdgeBrightness, browser3->brightness());
+  EXPECT_DOUBLE_EQ(kEdgeBrightness, browser4->brightness());
 }
 
 TEST_F(LayoutManager2Test, ClickToActivateBrowser) {

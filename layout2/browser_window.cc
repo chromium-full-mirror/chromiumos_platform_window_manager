@@ -31,9 +31,6 @@ const int kNudgeAnimPixels = 25;
 // Amount of time used for the no-op window-switching animation.
 const int kNudgeAnimMs = 180;
 
-// Opacity of |dimming_box_|.
-const double kDimmingOpacity = 0.4;
-
 }  // anonymous namespace
 
 namespace window_manager {
@@ -48,6 +45,7 @@ BrowserWindow::BrowserWindow(Window* win,
       unmaximized_anchoring_(ANCHOR_LEFT),
       status_area_displayed_(
           !win->chrome_state_xatoms().count(ATOM_CHROME_STATE_STATUS_HIDDEN)),
+      brightness_(1.0),
       transients_(
           new TransientWindowCollection(
               win,  // owner_win
@@ -186,11 +184,11 @@ void BrowserWindow::DoNudgeAnimation(bool move_to_left) {
   win_->SetMoveCompositedAnimation(animations);
 }
 
-void BrowserWindow::SetDimmed(bool dimmed, int anim_ms) {
-  if (dimmed)
-    dimming_box_->SetOpacity(kDimmingOpacity, anim_ms);
-  else
-    dimming_box_->SetOpacity(0, anim_ms);
+void BrowserWindow::SetBrightness(double brightness, int anim_ms) {
+  DCHECK_GE(brightness, 0.0);
+  DCHECK_LE(brightness, 1.0);
+  brightness_ = brightness;
+  dimming_box_->SetOpacity(1.0 - brightness, anim_ms);
 }
 
 void BrowserWindow::SetStatusAreaDisplayed(bool displayed) {
