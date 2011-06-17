@@ -694,12 +694,26 @@ void Window::SetUpdateClientPositionForMoves(bool update) {
 }
 
 void Window::SetBounds(const Rect& bounds, int anim_ms) {
-  DCHECK_NE(visibility_, VISIBILITY_UNSET) << " xid=" << xid_str_;
+  DLOG(INFO) << "Setting " << xid_str_ << "'s bounds to " << bounds
+             << " over " << anim_ms << " ms";
+  DCHECK_NE(visibility_, VISIBILITY_UNSET);
+  DCHECK(!override_redirect_);
 
   if (bounds.size() != client_size())
-    Resize(bounds.size(), GRAVITY_NORTHWEST);
-  if (bounds.position() != client_bounds_.position())
-    Move(bounds.position(), anim_ms);
+    SendWmSyncRequestMessage();
+
+  Rect new_client_bounds(
+      x_window_should_be_onscreen() ?
+          bounds.position() :
+          Point(kOffscreenX, kOffscreenY),
+      bounds.size());
+  if (new_client_bounds != client_bounds_) {
+    wm_->xconn()->ConfigureWindow(xid_, new_client_bounds);
+    client_bounds_ = new_client_bounds;
+  }
+
+  if (bounds.position() != composited_origin_)
+    MoveCompositedInternal(bounds.position(), MOVE_DIMENSIONS_X_AND_Y, anim_ms);
 }
 
 void Window::Move(const Point& origin, int anim_ms) {
@@ -1261,15 +1275,8 @@ void Window::UpdateClientWindowPosition() {
   if (override_redirect_)
     return;
 
-  // Without support in X11 for transforming input events, scaled windows can't
-  // receive input.
-  const bool should_be_onscreen =
-      visibility_ == VISIBILITY_SHOWN &&
-      composited_size() == client_size() &&
-      composited_opacity_ > 0.0;
-
   Point new_origin =
-      should_be_onscreen ?
+      x_window_should_be_onscreen() ?
       composited_origin_ :
       Point(kOffscreenX, kOffscreenY);
   if (new_origin != client_origin())

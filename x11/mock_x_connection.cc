@@ -140,6 +140,16 @@ bool MockXConnection::ResizeWindow(XWindow xid, const Size& size) {
   return true;
 }
 
+bool MockXConnection::ConfigureWindow(XWindow xid, const Rect& bounds) {
+  WindowInfo* info = GetWindowInfo(xid);
+  if (!info)
+    return false;
+  info->bounds = bounds;
+  info->changed = true;
+  info->num_configures++;
+  return true;
+}
+
 bool MockXConnection::RaiseWindow(XWindow xid) {
   if (!stacked_xids_->Contains(xid))
     return false;

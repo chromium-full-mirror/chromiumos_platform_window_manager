@@ -41,10 +41,7 @@ class MockXConnection : public XConnection {
   virtual bool UnmapWindow(XWindow xid);
   virtual bool MoveWindow(XWindow xid, const Point& pos);
   virtual bool ResizeWindow(XWindow xid, const Size& size);
-  virtual bool ConfigureWindow(XWindow xid, const Rect& bounds) {
-    return (MoveWindow(xid, Point(bounds.x, bounds.y)) &&
-            ResizeWindow(xid, Size(bounds.width, bounds.height)));
-  }
+  virtual bool ConfigureWindow(XWindow xid, const Rect& bounds);
   virtual bool RaiseWindow(XWindow xid);
   virtual bool FocusWindow(XWindow xid, XTime event_time);
   virtual bool StackWindow(XWindow xid, XWindow other, bool above);

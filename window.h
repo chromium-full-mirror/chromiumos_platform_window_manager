@@ -524,6 +524,16 @@ class Window {
     return client_has_redrawn_after_last_resize_ && !updates_frozen_;
   }
 
+  // Should the X (a.k.a. "client") window be onscreen?
+  // Without support in X11 for transforming input events, scaled windows can't
+  // receive input.
+  bool x_window_should_be_onscreen() const {
+    return visibility_ == VISIBILITY_SHOWN &&
+           composited_size() == client_size() &&
+           composited_opacity_ > 0.0;
+  }
+
+
   // Is the entirety of the client window currently offscreen?
   bool IsClientWindowOffscreen() const;
 

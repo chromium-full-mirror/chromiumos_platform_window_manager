@@ -1182,30 +1182,39 @@ TEST_F(WindowTest, AvoidMovingActorDuringResize) {
   // Move the window without resizing it.  Both the X window and actor should be
   // moved immediately.
   const Rect kBounds2(Point(60, 70), kInitialBounds.size());
+  info->num_configures = 0;
   win.SetBounds(kBounds2, 0);
   EXPECT_EQ(kBounds2, info->bounds);
   EXPECT_EQ(kBounds2, actor->GetBounds());
+  EXPECT_EQ(1, info->num_configures);
 
   // Simultaneously move and resize the window.  The X window should be updated
-  // but the actor should stay at the previous size and position.
+  // (by a single ConfigureWindow request -- see http://crosbug.com/16716) but
+  // the actor should stay at the previous size and position.
   const Rect kBounds3(80, 90, 100, 110);
+  info->num_configures = 0;
   win.SetBounds(kBounds3, 0);
   EXPECT_EQ(kBounds3, info->bounds);
   EXPECT_EQ(kBounds2, actor->GetBounds());
+  EXPECT_EQ(1, info->num_configures);
 
   // Now move the window again and resize it back to the previous size.  We
   // should move the actor now since it's at the (formerly stale, now correct)
   // current size.
   const Rect kBounds4(Point(150, 160), kBounds2.size());
+  info->num_configures = 0;
   win.SetBounds(kBounds4, 0);
   EXPECT_EQ(kBounds4, info->bounds);
   EXPECT_EQ(kBounds4, actor->GetBounds());
+  EXPECT_EQ(1, info->num_configures);
 
   // Move and resize the window yet again.
   const Rect kBounds5(180, 190, 200, 210);
+  info->num_configures = 0;
   win.SetBounds(kBounds5, 0);
   EXPECT_EQ(kBounds5, info->bounds);
   EXPECT_EQ(kBounds4, actor->GetBounds());
+  EXPECT_EQ(1, info->num_configures);
 
   // After we receive notice that the window has been painted, we should fetch a
   // new pixmap (resulting in a resized actor) and move the actor.
