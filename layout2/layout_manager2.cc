@@ -550,9 +550,11 @@ void LayoutManager2::InitKeyBindings() {
   key_bindings_group_->AddBinding(
       KeyBindings::KeyCombo(XK_Tab, KeyBindings::kAltMask),
       kCycleForwardAction);
-  key_bindings_group_->AddBinding(
-      KeyBindings::KeyCombo(XK_F5, 0),
-      kCycleForwardAction);
+  if (!FLAGS_multiple_windows) {
+    key_bindings_group_->AddBinding(
+        KeyBindings::KeyCombo(XK_F5, 0),
+        kCycleForwardAction);
+  }
 
   key_bindings_actions_->AddAction(
       kCycleBackwardAction,
@@ -563,9 +565,11 @@ void LayoutManager2::InitKeyBindings() {
       KeyBindings::KeyCombo(
           XK_Tab, KeyBindings::kAltMask | KeyBindings::kShiftMask),
       kCycleBackwardAction);
-  key_bindings_group_->AddBinding(
-      KeyBindings::KeyCombo(XK_F5, KeyBindings::kShiftMask),
-      kCycleBackwardAction);
+  if (!FLAGS_multiple_windows) {
+    key_bindings_group_->AddBinding(
+        KeyBindings::KeyCombo(XK_F5, KeyBindings::kShiftMask),
+        kCycleBackwardAction);
+  }
 
   for (int i = 0; i < 8; ++i) {
     const string action_name =
@@ -587,6 +591,9 @@ void LayoutManager2::InitKeyBindings() {
         NULL, NULL);
     key_bindings_group_->AddBinding(
         KeyBindings::KeyCombo(XK_Return, KeyBindings::kAltMask),
+        kToggleMaximizedAction);
+    key_bindings_group_->AddBinding(
+        KeyBindings::KeyCombo(XK_F5, 0),
         kToggleMaximizedAction);
 
     key_bindings_actions_->AddAction(
