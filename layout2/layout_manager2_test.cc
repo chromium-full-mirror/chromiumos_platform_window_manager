@@ -12,6 +12,7 @@
 #include "base/logging.h"
 #include "base/stringprintf.h"
 #include "cros/chromeos_wm_ipc_enums.h"
+#include "window_manager/layout2/browser_window.h"
 #include "window_manager/layout2/layout_manager2.h"
 #include "window_manager/panels/panel.h"
 #include "window_manager/shadow.h"
@@ -32,7 +33,73 @@ namespace window_manager {
 
 class LayoutManager2Test : public BasicWindowManagerTest {
  protected:
+  enum Side {
+    SIDE_LEFT = 0,
+    SIDE_RIGHT,
+  };
+
+  // Describes the configuration of browser windows at an edge of the screen.
+  enum EdgeConfiguration {
+    // There is a slice of an offscreen browser window visible at the edge of
+    // the screen.
+    EDGE_HAS_BROWSER = 0,
+
+    // No slice is visible (i.e. the active or secondary browser window on that
+    // side of the screen is flush with the edge).
+    EDGE_HAS_NO_BROWSER,
+  };
+
   LayoutManager2* layout_manager() { return wm_->layout_manager_.get(); }
+
+  // Computes the expected bounds of a browser window.
+  // Windows are laid out such that switching to a particular window effectively
+  // pans a viewport -- the windows' positions relative to each other don't
+  // change.
+  //
+  // |screen_bounds| contains a particular viewport.  For either the active
+  // (focused) or secondary browser window, the viewport is equivalent to the
+  // root window's bounds.  For offscreen windows, the viewport is shifted to
+  // the left or right.
+  //
+  // |side| represents the side of |screen_bounds| that the browser is on.
+  // |edge_config| describes whether a slice of the next offscreen browser
+  // window is visible at the edge of this window's side of the screen or not --
+  // if so, the window is shifted slightly away from the edge.
+  Rect GetExpectedBoundsForBrowser(
+      const Rect& screen_bounds,
+      Side side,
+      EdgeConfiguration edge_config,
+      int browser_width) {
+    const int kGap =
+        (edge_config == EDGE_HAS_BROWSER) ? LayoutManager2::kEdgeGapPixels : 0;
+
+    switch (side) {
+      case SIDE_LEFT:
+        return Rect(
+            screen_bounds.x + kGap, screen_bounds.y,
+            browser_width, screen_bounds.height);
+      case SIDE_RIGHT:
+        return Rect(
+            screen_bounds.right() - browser_width - kGap, screen_bounds.y,
+            browser_width, screen_bounds.height);
+      default:
+        NOTREACHED() << "Unknown side " << side;
+        return Rect();
+    }
+  }
+
+  // Drag the resize handle input window to the left or the right.
+  void DragResizeHandle(int dx) {
+    const XWindow kResizeXid = layout_manager()->resize_handle_xid_;
+    XEvent event;
+    xconn_->set_pointer_grab_xid(kResizeXid);
+    xconn_->InitButtonPressEvent(&event, kResizeXid, Point(0, 0), 1);
+    wm_->HandleEvent(&event);
+    xconn_->InitMotionNotifyEvent(&event, kResizeXid, Point(dx, 0));
+    wm_->HandleEvent(&event);
+    xconn_->InitButtonReleaseEvent(&event, kResizeXid, Point(dx, 0), 1);
+    wm_->HandleEvent(&event);
+  }
 };
 
 // Test that we set windows' horizontally- and vertically-maximized state.
@@ -563,6 +630,252 @@ TEST_F(LayoutManager2Test, CloseTransientWindowWhenOwnerIsUnmapped) {
   xconn_->InitUnmapEvent(&event, owner_xid);
   wm_->HandleEvent(&event);
   ASSERT_EQ(1, GetNumDeleteWindowMessagesForWindow(transient_xid));
+}
+
+TEST_F(LayoutManager2Test, MultipleWindowLayout) {
+  // Create and map four browser windows.
+  XWindow xid1 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info1 = xconn_->GetWindowInfoOrDie(xid1);
+  SendInitialEventsForWindow(xid1);
+  BrowserWindow* browser1 = layout_manager()->FindBrowserWindowByXid(xid1);
+  ASSERT_TRUE(browser1 != NULL);
+
+  XWindow xid2 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info2 = xconn_->GetWindowInfoOrDie(xid2);
+  SendInitialEventsForWindow(xid2);
+  BrowserWindow* browser2 = layout_manager()->FindBrowserWindowByXid(xid2);
+  ASSERT_TRUE(browser2 != NULL);
+
+  XWindow xid3 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info3 = xconn_->GetWindowInfoOrDie(xid3);
+  SendInitialEventsForWindow(xid3);
+  BrowserWindow* browser3 = layout_manager()->FindBrowserWindowByXid(xid3);
+  ASSERT_TRUE(browser3 != NULL);
+
+  XWindow xid4 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info4 = xconn_->GetWindowInfoOrDie(xid4);
+  SendInitialEventsForWindow(xid4);
+  ASSERT_EQ(xconn_->focused_xid(), xid4);
+  BrowserWindow* browser4 = layout_manager()->FindBrowserWindowByXid(xid4);
+  ASSERT_TRUE(browser4 != NULL);
+
+  const int kInitialWidth = layout_manager()->GetInitialUnmaximizedWidth();
+  const int kGap = LayoutManager2::kEdgeGapPixels;
+  const Rect kRootBounds = xconn_->root_bounds();
+
+  // Initially, the fourth window should be focused on the right, with the third
+  // window visible on the left and a strip of the second window visible at the
+  // left edge.
+  // +-+-----+-------+
+  // | |     |       |
+  // |2|  3  |   4*  |
+  // | |     |       |
+  // +-+-----+-------+
+  EXPECT_EQ(xconn_->focused_xid(), xid4);
+
+  Rect left_bounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_LEFT, EDGE_HAS_BROWSER, kInitialWidth);
+  Rect right_bounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_RIGHT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+  Rect left_offscreen_bounds =
+      GetExpectedBoundsForBrowser(
+          Rect(left_bounds.right() + kGap - kRootBounds.width, 0,
+               kRootBounds.width, kRootBounds.height),
+          SIDE_LEFT, EDGE_HAS_BROWSER, kInitialWidth);
+  Rect far_left_offscreen_bounds =
+      GetExpectedBoundsForBrowser(
+          Rect(left_offscreen_bounds.right() + kGap - kRootBounds.width, 0,
+               kRootBounds.width, kRootBounds.height),
+          SIDE_LEFT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+
+  EXPECT_EQ(far_left_offscreen_bounds, info1->bounds);
+  EXPECT_EQ(left_offscreen_bounds, info2->bounds);
+  EXPECT_EQ(left_bounds, info3->bounds);
+  EXPECT_EQ(right_bounds, info4->bounds);
+
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser4->win(), browser3->win()));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser3->win(), browser2->win()));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser2->win(), browser1->win()));
+
+  // Switch back to the second window, which should result in it being focused
+  // on the left, the third window being focused on the right, and strips of the
+  // first and fourth windows visible at the left and right edges of the screen,
+  // respectively.
+  // +-+-------+---+-+
+  // | |       |   | |
+  // |1|   2*  | 3 |4|
+  // | |       |   | |
+  // +-+-------+---+-+
+  SendActiveWindowMessage(xid2);
+  EXPECT_EQ(xconn_->focused_xid(), xid2);
+
+  left_bounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_LEFT, EDGE_HAS_BROWSER, kInitialWidth);
+  right_bounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_RIGHT, EDGE_HAS_BROWSER, kInitialWidth);
+  left_offscreen_bounds =
+      GetExpectedBoundsForBrowser(
+          Rect(left_bounds.right() + kGap - kRootBounds.width, 0,
+               kRootBounds.width, kRootBounds.height),
+          SIDE_LEFT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+  Rect right_offscreen_bounds =
+      GetExpectedBoundsForBrowser(
+          Rect(right_bounds.x - kGap, 0,
+               kRootBounds.width, kRootBounds.height),
+          SIDE_RIGHT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+
+  EXPECT_EQ(left_offscreen_bounds, info1->bounds);
+  EXPECT_EQ(left_bounds, info2->bounds);
+  EXPECT_EQ(right_bounds, info3->bounds);
+  EXPECT_EQ(right_offscreen_bounds, info4->bounds);
+
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser2->win(), browser3->win()));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser3->win(), browser4->win()));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser2->win(), browser1->win()));
+  // The relative stacking of the first and fourth browsers isn't important.
+
+  // Finally, switch to the first window.
+  // +-------+-----+-+
+  // |       |     | |
+  // |   1*  |  2  |3|
+  // |       |     | |
+  // +-------+-----+-+
+  SendActiveWindowMessage(xid1);
+  EXPECT_EQ(xconn_->focused_xid(), xid1);
+
+  left_bounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_LEFT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+  right_bounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_RIGHT, EDGE_HAS_BROWSER, kInitialWidth);
+  right_offscreen_bounds =
+      GetExpectedBoundsForBrowser(
+          Rect(right_bounds.x - kGap, 0,
+               kRootBounds.width, kRootBounds.height),
+          SIDE_RIGHT, EDGE_HAS_BROWSER, kInitialWidth);
+  Rect far_right_offscreen_bounds =
+      GetExpectedBoundsForBrowser(
+          Rect(right_offscreen_bounds.x - kGap, 0,
+               kRootBounds.width, kRootBounds.height),
+          SIDE_RIGHT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+
+  EXPECT_EQ(left_bounds, info1->bounds);
+  EXPECT_EQ(right_bounds, info2->bounds);
+  EXPECT_EQ(right_offscreen_bounds, info3->bounds);
+  EXPECT_EQ(far_right_offscreen_bounds, info4->bounds);
+
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser1->win(), browser2->win()));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser2->win(), browser3->win()));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(browser3->win(), browser4->win()));
+}
+
+TEST_F(LayoutManager2Test, ClickToActivateBrowser) {
+  // Create and map three browser windows.
+  XWindow xid1 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info1 = xconn_->GetWindowInfoOrDie(xid1);
+  SendInitialEventsForWindow(xid1);
+
+  XWindow xid2 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info2 = xconn_->GetWindowInfoOrDie(xid2);
+  SendInitialEventsForWindow(xid2);
+
+  XWindow xid3 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info3 = xconn_->GetWindowInfoOrDie(xid3);
+  SendInitialEventsForWindow(xid3);
+
+  // The third window should be focused initially.
+  const int kInitialWidth = layout_manager()->GetInitialUnmaximizedWidth();
+  const Rect kRootBounds = xconn_->root_bounds();
+  EXPECT_EQ(xid3, xconn_->focused_xid());
+  EXPECT_EQ(GetExpectedBoundsForBrowser(
+                kRootBounds, SIDE_RIGHT, EDGE_HAS_NO_BROWSER, kInitialWidth),
+            info3->bounds);
+
+  // When we click on the input window at the left edge of the screen, we should
+  // activate the first browser window.
+  XEvent event;
+  xconn_->InitButtonPressEvent(
+      &event, layout_manager()->left_edge_input_xid_, Point(0, 0), 1);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(xid1, xconn_->focused_xid());
+  EXPECT_EQ(GetExpectedBoundsForBrowser(
+                kRootBounds, SIDE_LEFT, EDGE_HAS_NO_BROWSER, kInitialWidth),
+            info1->bounds);
+
+  // Clicking on the (onscreen) second browser window should activate it.
+  // The click should also be passed through.
+  int num_replay_ungrabs = xconn_->num_pointer_ungrabs_with_replayed_events();
+  xconn_->set_pointer_grab_xid(xid2);
+  xconn_->InitButtonPressEvent(&event, xid2, Point(0, 0), 1);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(0, xconn_->pointer_grab_xid());
+  EXPECT_EQ(num_replay_ungrabs + 1,
+            xconn_->num_pointer_ungrabs_with_replayed_events());
+  EXPECT_EQ(xid2, xconn_->focused_xid());
+  EXPECT_EQ(GetExpectedBoundsForBrowser(
+                kRootBounds, SIDE_RIGHT, EDGE_HAS_BROWSER, kInitialWidth),
+            info2->bounds);
+}
+
+TEST_F(LayoutManager2Test, ResizeBrowser) {
+  XWindow xid1 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info1 = xconn_->GetWindowInfoOrDie(xid1);
+  SendInitialEventsForWindow(xid1);
+
+  XWindow xid2 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info2 = xconn_->GetWindowInfoOrDie(xid2);
+  SendInitialEventsForWindow(xid2);
+
+  const Rect kRootBounds = xconn_->root_bounds();
+
+  // Make the second browser window smaller by dragging the resize handle to the
+  // right.
+  int new_width = info2->bounds.width - 50;
+  DragResizeHandle(-1 * (new_width - info2->bounds.width));
+  EXPECT_EQ(GetExpectedBoundsForBrowser(
+                kRootBounds, SIDE_RIGHT, EDGE_HAS_NO_BROWSER, new_width),
+            info2->bounds);
+
+  // Now drag it back to the the left.
+  new_width = info2->bounds.width + 25;
+  DragResizeHandle(-1 * (new_width - info2->bounds.width));
+  EXPECT_EQ(GetExpectedBoundsForBrowser(
+                kRootBounds, SIDE_RIGHT, EDGE_HAS_NO_BROWSER, new_width),
+            info2->bounds);
+
+  // Do the same thing with the first browser on the left side of the screen.
+  SendActiveWindowMessage(xid1);
+  EXPECT_EQ(xconn_->focused_xid(), xid1);
+  new_width = info1->bounds.width - 60;
+  DragResizeHandle(new_width - info1->bounds.width);
+  EXPECT_EQ(GetExpectedBoundsForBrowser(
+                kRootBounds, SIDE_LEFT, EDGE_HAS_NO_BROWSER, new_width),
+            info1->bounds);
+
+  new_width = info1->bounds.width + 30;
+  DragResizeHandle(new_width - info1->bounds.width);
+  EXPECT_EQ(GetExpectedBoundsForBrowser(
+                kRootBounds, SIDE_LEFT, EDGE_HAS_NO_BROWSER, new_width),
+            info1->bounds);
+
+  // Try resizing via the keyboard as well.
+  const KeyBindings::KeyCombo kAltCommaKeyCombo(
+      XK_comma, KeyBindings::kAltMask);
+  const XTime kEventTime = wm_->GetCurrentTimeFromServer();
+  int old_width = info1->bounds.width;
+  SendKey(xconn_->GetRootWindow(), kAltCommaKeyCombo, kEventTime, kEventTime);
+  EXPECT_LT(info1->bounds.width, old_width);
+
+  const KeyBindings::KeyCombo kAltPeriodKeyCombo(
+      XK_period, KeyBindings::kAltMask);
+  old_width = info1->bounds.width;
+  SendKey(xconn_->GetRootWindow(), kAltPeriodKeyCombo, kEventTime, kEventTime);
+  EXPECT_GT(info1->bounds.width, old_width);
 }
 
 }  // namespace window_manager

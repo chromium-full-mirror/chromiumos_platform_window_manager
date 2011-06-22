@@ -32,8 +32,8 @@ using window_manager::util::XidStr;
 
 namespace window_manager {
 
-const int MockXConnection::kDisplayWidth = 1024;
-const int MockXConnection::kDisplayHeight = 768;
+const int MockXConnection::kDisplayWidth = 1280;
+const int MockXConnection::kDisplayHeight = 800;
 const XID MockXConnection::kTransparentCursor = 1000;  // arbitrary
 
 MockXConnection::MockXConnection()

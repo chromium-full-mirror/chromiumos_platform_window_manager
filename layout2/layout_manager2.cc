@@ -41,10 +41,6 @@ DEFINE_string(initial_chrome_window_mapped_file,
 DEFINE_bool(multiple_windows, true,
             "Support displaying multiple windows onscreen at once");
 
-DEFINE_bool(show_window_edges, true,
-            "Show a bit of the next and previous windows at the edges of the "
-            "screen");
-
 DEFINE_string(xterm_command, "xterm", "Command to launch a terminal");
 
 using std::make_pair;
@@ -68,9 +64,6 @@ const int kWindowAnimMs = 150;
 // Maximum amount of time we'll take to cycle through windows.
 const int kMaxWindowCycleAnimMs = 400;
 
-// Width used for new windows (although it may be capped).
-const int kWindowInitialWidthPixels = 1024;
-
 // Number of steps between the minimum and maximum browser window size for the
 // incremental resize keyboard shortcuts.
 const int kNumIncrementalResizeSteps = 2;
@@ -83,10 +76,6 @@ const double kIncrementalResizeMinChangePercent = 0.25;
 // size that a browser window can be in its non-maximized state.
 const int kStatusWidthPixels = 200;
 
-// How many pixels should we leave at the edge of the screen for the next window
-// to be visible?
-const int kEdgeGapPixels = 32;
-
 // Size of the invisible resize handle that can be dragged to resize the active
 // browser window in non-maximized mode.
 const int kResizeHandleWidthPixels = 12;
@@ -95,18 +84,19 @@ const int kResizeHandleWidthPixels = 12;
 const double kResizeBoxOpacity = 0.4;
 
 // Key binding action names.
-static const char kActivateBrowserByIndexActionFormat[] = "activate-browser-%d";
-static const char kCycleBackwardAction[] = "cycle-browser-backward";
-static const char kCycleForwardAction[] = "cycle-browser-forward";
-static const char kLaunchTerminalAction[] = "launch-terminal";
-static const char kResizeLeftAction[] = "resize-browser-left";
-static const char kResizeRightAction[] = "resize-browser-right";
-static const char kToggleMaximizedAction[] = "toggle-browser-maximized";
-#ifndef NDEBUG
-static const char kToggleShowWindowEdgesAction[] = "toggle-show-window-edges";
-#endif
+const char kActivateBrowserByIndexActionFormat[] = "activate-browser-%d";
+const char kCycleBackwardAction[] = "cycle-browser-backward";
+const char kCycleForwardAction[] = "cycle-browser-forward";
+const char kLaunchTerminalAction[] = "launch-terminal";
+const char kResizeLeftAction[] = "resize-browser-left";
+const char kResizeRightAction[] = "resize-browser-right";
+const char kToggleMaximizedAction[] = "toggle-browser-maximized";
 
 }  // anonymous namespace
+
+// Static members (non-anonymous so they can be used by tests).
+const int LayoutManager2::kWindowInitialWidthPixels = 1024;
+const int LayoutManager2::kEdgeGapPixels = 32;
 
 LayoutManager2::LayoutManager2(WindowManager* wm)
     : wm_(wm),
@@ -513,8 +503,7 @@ int LayoutManager2::GetMinUnmaximizedWidth() const {
 }
 
 int LayoutManager2::GetMaxUnmaximizedWidth() const {
-  return wm_->width() - kStatusWidthPixels -
-      (FLAGS_show_window_edges ? 2 * kEdgeGapPixels : 0);
+  return wm_->width() - kStatusWidthPixels - 2 * kEdgeGapPixels;
 }
 
 int LayoutManager2::ConstrainUnmaximizedWidth(int requested_width) {
@@ -625,20 +614,6 @@ void LayoutManager2::InitKeyBindings() {
       KeyBindings::KeyCombo(
           XK_t, KeyBindings::kControlMask | KeyBindings::kAltMask),
       kLaunchTerminalAction);
-
-#ifndef NDEBUG
-  const int kCtrlAltShiftMask = KeyBindings::kControlMask |
-                                KeyBindings::kAltMask |
-                                KeyBindings::kShiftMask;
-
-  key_bindings_actions_->AddAction(
-      kToggleShowWindowEdgesAction,
-      NewPermanentCallback(&ToggleBool, &FLAGS_show_window_edges),
-      NULL, NULL);
-  key_bindings_group_->AddBinding(
-      KeyBindings::KeyCombo(XK_e, kCtrlAltShiftMask),
-      kToggleShowWindowEdgesAction);
-#endif
 }
 
 void LayoutManager2::HandleBrowserWindowMap(Window* win) {
@@ -758,9 +733,6 @@ void LayoutManager2::ComputeBrowserWindowBounds(vector<Rect>* bounds,
     DCHECK_GE(left_index, 0);
     DCHECK_LE(right_index, num_browser_windows() - 1);
 
-    // Width of the gaps to leave at the edge of the screen.
-    const int gap_width = FLAGS_show_window_edges ? kEdgeGapPixels : 0;
-
     if (left_offscreen_index && left_index > 0)
       *left_offscreen_index = left_index - 1;
     if (right_offscreen_index && right_index < num_browser_windows() - 1)
@@ -772,34 +744,39 @@ void LayoutManager2::ComputeBrowserWindowBounds(vector<Rect>* bounds,
     // Assign positions to the left and right windows, leaving small gaps on the
     // sides if there are more windows in either direction.
     (*bounds)[left_index].reset(
-        left_index >= 1 ? gap_width : 0, 0,
+        left_index >= 1 ? kEdgeGapPixels : 0, 0,
         left_browser->unmaximized_width(), wm_->height());
     (*bounds)[right_index].reset(
         wm_->width() -
         right_browser->unmaximized_width() -
-        (right_index < num_browser_windows() - 1 ? gap_width : 0), 0,
+        (right_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
         right_browser->unmaximized_width(), wm_->height());
 
     // Next, walk to the left, putting each window one screen width from the
-    // right edge of the window to its right.
+    // right edge of the window to its right (plus any gap that we're reserving
+    // for the next window beyond that one).
     int prev_right_edge =
-        (*bounds)[left_index].x + left_browser->unmaximized_width();
+        (*bounds)[left_index].right() +
+        (left_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0);
     for (int i = left_index - 1; i >= 0; --i) {
       BrowserWindow* browser = browser_windows_[i].get();
       (*bounds)[i].reset(
-          prev_right_edge - wm_->width(), 0,
+          prev_right_edge - wm_->width() + (i >= 1 ? kEdgeGapPixels : 0), 0,
           browser->unmaximized_width(), wm_->height());
-      prev_right_edge = (*bounds)[i].x + browser->unmaximized_width();
+      prev_right_edge = (*bounds)[i].right() +
+          (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0);
     }
 
     // Now take the same approach while walking to the right.
-    int prev_left_edge = (*bounds)[right_index].x;
+    int prev_left_edge = (*bounds)[right_index].x -
+        (right_index >= 1 ? kEdgeGapPixels : 0);
     for (int i = right_index + 1; i < num_browser_windows(); ++i) {
       BrowserWindow* browser = browser_windows_[i].get();
       (*bounds)[i].reset(
-          prev_left_edge + wm_->width() - browser->unmaximized_width(), 0,
+          prev_left_edge + wm_->width() - browser->unmaximized_width() -
+            (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
           browser->unmaximized_width(), wm_->height());
-      prev_left_edge = (*bounds)[i].x;
+      prev_left_edge = (*bounds)[i].x - (i >= 1 ? kEdgeGapPixels : 0);
     }
   }
 }
@@ -940,8 +917,7 @@ void LayoutManager2::ArrangeBrowserWindows(
         (right_offscreen_index >= 0 && i >= right_offscreen_index);
 
     // Is the window onscreen and extending to the right edge (disregarding any
-    // sliver of a window that we may be showing due to
-    // FLAGS_show_window_edges)?
+    // sliver of a window that we may be showing at the edge of the screen)?
     const bool on_right =
         (maximized_ && i == active_browser_index_) ||
         (i == active_browser_index_ && !browser->anchored_to_left()) ||

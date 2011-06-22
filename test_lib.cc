@@ -150,9 +150,8 @@ void BasicWindowManagerTest::RegisterCommonKeySyms() {
   xconn_->AddKeyMapping(next_keycode++, XK_Escape);
   xconn_->AddKeyMapping(next_keycode++, XK_Left);
   xconn_->AddKeyMapping(next_keycode++, XK_Right);
-  xconn_->AddKeyMapping(next_keycode++, XF86XK_AudioLowerVolume);
-  xconn_->AddKeyMapping(next_keycode++, XF86XK_AudioMute);
-  xconn_->AddKeyMapping(next_keycode++, XF86XK_AudioRaiseVolume);
+  xconn_->AddKeyMapping(next_keycode++, XK_comma);
+  xconn_->AddKeyMapping(next_keycode++, XK_period);
 }
 
 void BasicWindowManagerTest::CreateNewWm() {

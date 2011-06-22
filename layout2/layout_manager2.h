@@ -95,7 +95,10 @@ class LayoutManager2 : public EventConsumer,
   bool TakeFocus(XTime timestamp);
 
  private:
+  friend class LayoutManager2Test;
   FRIEND_TEST(LayoutManager2Test, InitialBrowserWindow);
+  FRIEND_TEST(LayoutManager2Test, MultipleWindowLayout);
+  FRIEND_TEST(LayoutManager2Test, ClickToActivateBrowser);
 
   // Specifies ArrangeBrowserWindows()'s behavior with regard to assigning the
   // input focus.
@@ -110,6 +113,13 @@ class LayoutManager2 : public EventConsumer,
     // panel).
     PRESERVE_FOCUS_DURING_ARRANGE,
   };
+
+  // Width used for new windows (although it may be capped).
+  static const int kWindowInitialWidthPixels;
+
+  // How many pixels should we leave at the edge of the screen for the next
+  // window to be visible?
+  static const int kEdgeGapPixels;
 
   bool should_maximize_new_browser() const {
     return maximized_ && num_browser_windows() != 1;
