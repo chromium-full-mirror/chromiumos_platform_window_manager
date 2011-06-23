@@ -459,11 +459,7 @@ void OpenGlDrawVisitor::DrawNeedle() {
   gl_interface_->Rotatef(num_frames_drawn_, 0.f, 0.f, 1.f);
   gl_interface_->Scalef(30, 3, 1.f);
   gl_interface_->Color4f(1.f, 0.f, 0.f, 0.8f);
-  vector<Rect>::const_iterator it = damaged_region_.rects().begin();
-  for (; it != damaged_region_.rects().end(); ++it) {
-    gl_interface_->Scissor((*it).x, (*it).y, (*it).width, (*it).height);
-    gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-  }
+  gl_interface_->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
   gl_interface_->PopMatrix();
   PROFILER_MARKER_END(DrawNeedle);
 }
@@ -489,7 +485,9 @@ void OpenGlDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
   state_cache_.Invalidate();
 
   const bool partial_update_possible =
-      gl_interface_->IsCapableOfPartialUpdates() && !damaged_region_.IsEmpty();
+      !FLAGS_compositor_display_debug_needle &&
+      gl_interface_->IsCapableOfPartialUpdates() &&
+      !damaged_region_.IsEmpty();
 
   bool do_partial_update = false;
 
@@ -547,10 +545,10 @@ void OpenGlDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
 
   CHECK_GL_ERROR(gl_interface_);
 
+  gl_interface_->Disable(GL_SCISSOR_TEST);
+
   if (FLAGS_compositor_display_debug_needle)
     DrawNeedle();
-
-  gl_interface_->Disable(GL_SCISSOR_TEST);
 
   PROFILER_MARKER_BEGIN(Swap_Buffer);
   if (do_partial_update) {
