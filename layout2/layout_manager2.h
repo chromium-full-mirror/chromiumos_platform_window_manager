@@ -14,6 +14,7 @@
 
 #include "base/basictypes.h"
 #include "base/scoped_ptr.h"
+#include "cros/chromeos_wm_ipc_enums.h"
 #include "window_manager/compositor/compositor.h"
 #include "window_manager/event_consumer.h"
 #include "window_manager/focus_manager.h"
@@ -39,7 +40,10 @@ class LayoutManager2 : public EventConsumer,
   explicit LayoutManager2(WindowManager* wm);
   virtual ~LayoutManager2();
 
-  bool maximized() const { return maximized_; }
+  chromeos::WmIpcLayoutMode layout_mode() const { return layout_mode_; }
+  bool maximized() const {
+    return layout_mode_ == chromeos::WM_IPC_LAYOUT_MAXIMIZED;
+  }
   int num_browser_windows() const { return browser_windows_.size(); }
 
   // EventConsumer implementation.
@@ -142,10 +146,6 @@ class LayoutManager2 : public EventConsumer,
   // Brightness for browser windows shown at the edges of the screen.
   static const double kEdgeBrowserWindowBrightness;
 
-  bool should_maximize_new_browser() const {
-    return maximized_ && num_browser_windows() != 1;
-  }
-
   // Get the currently-active browser window, or NULL if none is active (i.e.
   // |browser_windows_| is empty).
   BrowserWindow* GetActiveBrowserWindow() const;
@@ -231,9 +231,12 @@ class LayoutManager2 : public EventConsumer,
   // SetActiveBrowserWindow() and ArrangeBrowserWindows().
   void ActivateBrowserWindowByIndex(int browser_index);
 
-  // Toggle maximization.
-  // Calls ArrangeBrowserWindows() itself.
+  // Call SetLayoutMode() to toggle back and forth between the maximized and
+  // overlapping modes.
   void ToggleMaximized();
+
+  // Change the layout mode.
+  void SetLayoutMode(chromeos::WmIpcLayoutMode mode, bool arrange_browsers);
 
   // Change the active browser window's stored width to use while unmaximized.
   // If |maximized_| is currently false, the window is also resized.
@@ -290,8 +293,8 @@ class LayoutManager2 : public EventConsumer,
   // Index in |browsers_| of the active browser window.
   int active_browser_index_;
 
-  // Is the active browser window maximized?
-  bool maximized_;
+  // The current layout mode (e.g. maximized, overlapping, etc.).
+  chromeos::WmIpcLayoutMode layout_mode_;
 
   // The currently-fullscreen browser window, or NULL if none is fullscreen.
   BrowserWindow* fullscreen_browser_;

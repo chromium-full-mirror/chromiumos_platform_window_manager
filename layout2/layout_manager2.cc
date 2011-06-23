@@ -17,7 +17,6 @@ extern "C" {
 
 #include "base/logging.h"
 #include "base/string_util.h"
-#include "cros/chromeos_wm_ipc_enums.h"
 #include "window_manager/atom_cache.h"
 #include "window_manager/callback.h"
 #include "window_manager/event_consumer_registrar.h"
@@ -43,6 +42,9 @@ DEFINE_bool(multiple_windows, true,
 
 DEFINE_string(xterm_command, "xterm", "Command to launch a terminal");
 
+using chromeos::WM_IPC_LAYOUT_MAXIMIZED;
+using chromeos::WM_IPC_LAYOUT_OVERLAPPING;
+using chromeos::WmIpcLayoutMode;
 using std::make_pair;
 using std::map;
 using std::max;
@@ -110,7 +112,8 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
       key_bindings_actions_(new KeyBindingsActionRegistrar(wm->key_bindings())),
       key_bindings_group_(new KeyBindingsGroup(wm->key_bindings())),
       active_browser_index_(-1),
-      maximized_(true),
+      // Initialized to unwanted value to force SetLayoutMode() update later.
+      layout_mode_(WM_IPC_LAYOUT_OVERLAPPING),
       fullscreen_browser_(NULL),
       anim_ms_for_pending_arrange_(0),
       resize_handle_xid_(wm->CreateInputWindow(Rect(-1, -1, 1, 1), 0)),
@@ -126,9 +129,13 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
       first_browser_window_mapped_(false) {
   event_consumer_registrar_->RegisterForChromeMessages(
       chromeos::WM_IPC_MESSAGE_WM_CYCLE_WINDOWS);
+  event_consumer_registrar_->RegisterForChromeMessages(
+      chromeos::WM_IPC_MESSAGE_WM_SET_LAYOUT_MODE);
   wm_->focus_manager()->RegisterFocusChangeListener(this);
   wm_->modality_handler()->RegisterModalityChangeListener(this);
+
   InitKeyBindings();
+  SetLayoutMode(WM_IPC_LAYOUT_MAXIMIZED, false);
 
   wm_->stacking_manager()->StackXidAtTopOfLayer(
       resize_handle_xid_,
@@ -200,7 +207,7 @@ bool LayoutManager2::HandleWindowMapRequest(Window* win) {
     win->Move(Point(wm_->width(), 0), 0);
 
     const bool maximize =
-        !FLAGS_multiple_windows || (maximized_ && num_browser_windows() != 1);
+        !FLAGS_multiple_windows || (maximized() && num_browser_windows() != 1);
     const int width =
         maximize || win->wm_state_fullscreen() ?
         wm_->width() :
@@ -257,7 +264,7 @@ void LayoutManager2::HandleWindowUnmap(Window* win) {
   browser_windows_.erase(browser_windows_.begin() + browser_index);
 
   if (num_browser_windows() <= 1)
-    maximized_ = true;
+    SetLayoutMode(WM_IPC_LAYOUT_MAXIMIZED, false);
 
   if (browser_windows_.empty()) {
     active_browser_index_ = -1;
@@ -384,8 +391,16 @@ void LayoutManager2::HandlePointerMotion(XWindow xid,
 }
 
 void LayoutManager2::HandleChromeMessage(const WmIpc::Message& msg) {
-  if (msg.type() == chromeos::WM_IPC_MESSAGE_WM_CYCLE_WINDOWS)
-    CycleActiveBrowserWindow(msg.param(0) != 0);
+  switch (msg.type()) {
+    case chromeos::WM_IPC_MESSAGE_WM_CYCLE_WINDOWS:
+      CycleActiveBrowserWindow(msg.param(0) != 0);
+      break;
+    case chromeos::WM_IPC_MESSAGE_WM_SET_LAYOUT_MODE:
+      SetLayoutMode(static_cast<WmIpcLayoutMode>(msg.param(0)), true);
+      break;
+    default:
+      NOTREACHED() << "Unexpected Chrome message of type " << msg.type();
+  }
 }
 
 void LayoutManager2::HandleClientMessage(XWindow xid,
@@ -502,7 +517,7 @@ int LayoutManager2::GetWindowAnimationMs(int new_index) const {
   const int num_windows_to_traverse =
       max(new_index, active_browser_index_) -
       min(new_index, active_browser_index_);
-  return maximized_ ?
+  return maximized() ?
          min(num_windows_to_traverse * kWindowAnimMs, kMaxWindowCycleAnimMs) :
          kWindowAnimMs;
 }
@@ -566,9 +581,6 @@ void LayoutManager2::InitKeyBindings() {
         NewPermanentCallback(this, &LayoutManager2::ToggleMaximized),
         NULL, NULL);
     key_bindings_group_->AddBinding(
-        KeyBindings::KeyCombo(XK_Return, KeyBindings::kAltMask),
-        kToggleMaximizedAction);
-    key_bindings_group_->AddBinding(
         KeyBindings::KeyCombo(XK_F5, 0),
         kToggleMaximizedAction);
 
@@ -607,9 +619,6 @@ void LayoutManager2::HandleBrowserWindowMap(Window* win) {
   DCHECK(FindBrowserWindowIndexByWindow(*win) < 0)
       << "Window " << win->xid_str() << " is already being tracked";
 
-  if (FLAGS_multiple_windows && maximized_ && num_browser_windows() == 1)
-    maximized_ = false;
-
   shared_ptr<BrowserWindow> browser(
       new BrowserWindow(win, this, GetInitialUnmaximizedWidth()));
 
@@ -620,6 +629,9 @@ void LayoutManager2::HandleBrowserWindowMap(Window* win) {
   } else {
     browser_windows_.push_back(browser);
   }
+
+  if (FLAGS_multiple_windows && maximized() && num_browser_windows() == 2)
+    SetLayoutMode(WM_IPC_LAYOUT_OVERLAPPING, false);
 
   if (win->wm_state_fullscreen())
     SetFullscreenBrowserWindow(browser.get());
@@ -697,73 +709,79 @@ void LayoutManager2::ComputeBrowserWindowBounds(vector<Rect>* bounds,
   BrowserWindow* active_browser = GetActiveBrowserWindow();
   DCHECK(active_browser);
 
-  if (maximized_) {
-    // The maximized case is simple: align the active browser window with the
-    // left edge of the screen and move one screen width away from it for each
-    // other window.
-    (*bounds)[active_browser_index_].reset(0, 0, wm_->width(), wm_->height());
-    for (int i = active_browser_index_ - 1; i >= 0; --i)
-      (*bounds)[i].reset(
-          (*bounds)[i + 1].x - wm_->width(), 0, wm_->width(), wm_->height());
-    for (int i = active_browser_index_ + 1; i < num_browser_windows(); ++i)
-      (*bounds)[i].reset(
-          (*bounds)[i - 1].x + wm_->width(), 0, wm_->width(), wm_->height());
-
-  } else {
-    // Find the index of the browser windows displayed on the left and right
-    // portions of the screen.
-    const int left_index =
-        active_browser_index_ - (active_browser->anchored_to_left() ? 0 : 1);
-    const int right_index =
-        active_browser_index_ + (active_browser->anchored_to_left() ? 1 : 0);
-    DCHECK_GE(left_index, 0);
-    DCHECK_LE(right_index, num_browser_windows() - 1);
-
-    if (left_offscreen_index && left_index > 0)
-      *left_offscreen_index = left_index - 1;
-    if (right_offscreen_index && right_index < num_browser_windows() - 1)
-      *right_offscreen_index = right_index + 1;
-
-    BrowserWindow* left_browser = browser_windows_[left_index].get();
-    BrowserWindow* right_browser = browser_windows_[right_index].get();
-
-    // Assign positions to the left and right windows, leaving small gaps on the
-    // sides if there are more windows in either direction.
-    (*bounds)[left_index].reset(
-        left_index >= 1 ? kEdgeGapPixels : 0, 0,
-        left_browser->unmaximized_width(), wm_->height());
-    (*bounds)[right_index].reset(
-        wm_->width() -
-        right_browser->unmaximized_width() -
-        (right_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
-        right_browser->unmaximized_width(), wm_->height());
-
-    // Next, walk to the left, putting each window one screen width from the
-    // right edge of the window to its right (plus any gap that we're reserving
-    // for the next window beyond that one).
-    int prev_right_edge =
-        (*bounds)[left_index].right() +
-        (left_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0);
-    for (int i = left_index - 1; i >= 0; --i) {
-      BrowserWindow* browser = browser_windows_[i].get();
-      (*bounds)[i].reset(
-          prev_right_edge - wm_->width() + (i >= 1 ? kEdgeGapPixels : 0), 0,
-          browser->unmaximized_width(), wm_->height());
-      prev_right_edge = (*bounds)[i].right() +
-          (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0);
+  switch (layout_mode_) {
+    case WM_IPC_LAYOUT_MAXIMIZED: {
+      // The maximized case is simple: align the active browser window with the
+      // left edge of the screen and move one screen width away from it for each
+      // other window.
+      (*bounds)[active_browser_index_].reset(0, 0, wm_->width(), wm_->height());
+      for (int i = active_browser_index_ - 1; i >= 0; --i)
+        (*bounds)[i].reset(
+            (*bounds)[i + 1].x - wm_->width(), 0, wm_->width(), wm_->height());
+      for (int i = active_browser_index_ + 1; i < num_browser_windows(); ++i)
+        (*bounds)[i].reset(
+            (*bounds)[i - 1].x + wm_->width(), 0, wm_->width(), wm_->height());
+      break;
     }
+    case WM_IPC_LAYOUT_OVERLAPPING: {
+      // Find the index of the browser windows displayed on the left and right
+      // portions of the screen.
+      const int left_index =
+          active_browser_index_ - (active_browser->anchored_to_left() ? 0 : 1);
+      const int right_index =
+          active_browser_index_ + (active_browser->anchored_to_left() ? 1 : 0);
+      DCHECK_GE(left_index, 0);
+      DCHECK_LE(right_index, num_browser_windows() - 1);
 
-    // Now take the same approach while walking to the right.
-    int prev_left_edge = (*bounds)[right_index].x -
-        (right_index >= 1 ? kEdgeGapPixels : 0);
-    for (int i = right_index + 1; i < num_browser_windows(); ++i) {
-      BrowserWindow* browser = browser_windows_[i].get();
-      (*bounds)[i].reset(
-          prev_left_edge + wm_->width() - browser->unmaximized_width() -
-            (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
-          browser->unmaximized_width(), wm_->height());
-      prev_left_edge = (*bounds)[i].x - (i >= 1 ? kEdgeGapPixels : 0);
+      if (left_offscreen_index && left_index > 0)
+        *left_offscreen_index = left_index - 1;
+      if (right_offscreen_index && right_index < num_browser_windows() - 1)
+        *right_offscreen_index = right_index + 1;
+
+      BrowserWindow* left_browser = browser_windows_[left_index].get();
+      BrowserWindow* right_browser = browser_windows_[right_index].get();
+
+      // Assign positions to the left and right windows, leaving small gaps on
+      // the sides if there are more windows in either direction.
+      (*bounds)[left_index].reset(
+          left_index >= 1 ? kEdgeGapPixels : 0, 0,
+          left_browser->unmaximized_width(), wm_->height());
+      (*bounds)[right_index].reset(
+          wm_->width() -
+          right_browser->unmaximized_width() -
+          (right_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
+          right_browser->unmaximized_width(), wm_->height());
+
+      // Next, walk to the left, putting each window one screen width from the
+      // right edge of the window to its right (plus any gap that we're
+      // reserving for the next window beyond that one).
+      int prev_right_edge =
+          (*bounds)[left_index].right() +
+          (left_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0);
+      for (int i = left_index - 1; i >= 0; --i) {
+        BrowserWindow* browser = browser_windows_[i].get();
+        (*bounds)[i].reset(
+            prev_right_edge - wm_->width() + (i >= 1 ? kEdgeGapPixels : 0), 0,
+            browser->unmaximized_width(), wm_->height());
+        prev_right_edge = (*bounds)[i].right() +
+            (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0);
+      }
+
+      // Now take the same approach while walking to the right.
+      int prev_left_edge = (*bounds)[right_index].x -
+          (right_index >= 1 ? kEdgeGapPixels : 0);
+      for (int i = right_index + 1; i < num_browser_windows(); ++i) {
+        BrowserWindow* browser = browser_windows_[i].get();
+        (*bounds)[i].reset(
+            prev_left_edge + wm_->width() - browser->unmaximized_width() -
+              (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
+            browser->unmaximized_width(), wm_->height());
+        prev_left_edge = (*bounds)[i].x - (i >= 1 ? kEdgeGapPixels : 0);
+      }
+      break;
     }
+    default:
+      NOTREACHED() << "Unhandled layout mode " << layout_mode_;
   }
 }
 
@@ -781,7 +799,7 @@ void LayoutManager2::RestackBrowserWindows(
         StackingManager::LAYER_FULLSCREEN_WINDOW);
 
   StackingManager::ShadowPolicy shadow_policy =
-      maximized_ ?
+      maximized() ?
       StackingManager::SHADOW_AT_BOTTOM_OF_SHADOW_LAYER :
       StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR;
 
@@ -882,7 +900,7 @@ void LayoutManager2::ArrangeBrowserWindows(
     active_browser->TakeFocus(timestamp_for_focus);
 
   int secondary_browser_index = -1;
-  if (!maximized_ && num_browser_windows() > 1) {
+  if (!maximized() && num_browser_windows() > 1) {
     secondary_browser_index =
         active_browser_index_ + (active_browser->anchored_to_left() ? 1 : -1);
     DCHECK_GE(secondary_browser_index, 0);
@@ -909,19 +927,19 @@ void LayoutManager2::ArrangeBrowserWindows(
 
     // Is the window either partially or entirely offscreen?
     const bool offscreen =
-        (maximized_ && !active) ||
+        (maximized() && !active) ||
         (left_offscreen_index >= 0 && i <= left_offscreen_index) ||
         (right_offscreen_index >= 0 && i >= right_offscreen_index);
 
     // Is the window onscreen and extending to the right edge (disregarding any
     // sliver of a window that we may be showing at the edge of the screen)?
     const bool on_right =
-        (maximized_ && active) ||
+        (maximized() && active) ||
         (active && !browser->anchored_to_left()) ||
         (!active && !offscreen && active_browser->anchored_to_left());
     browser->SetStatusAreaDisplayed(on_right);
 
-    browser->SetMaximizedProperty(maximized_);
+    browser->SetMaximizedProperty(maximized());
     browser->SetBounds(bounds[i], anim_ms);
 
     double brightness = 1.0;
@@ -939,7 +957,7 @@ void LayoutManager2::ArrangeBrowserWindows(
             (1.0 - kSecondaryBrowserWindowBrightness);
         brightness_anim_ms = kSecondaryBrowserWindowDimAnimMs * fraction;
       }
-    } else if (!maximized_ && offscreen) {
+    } else if (!maximized() && offscreen) {
       brightness = kEdgeBrowserWindowBrightness;
     }
 
@@ -1024,18 +1042,48 @@ void LayoutManager2::ActivateBrowserWindowByIndex(int browser_index) {
 }
 
 void LayoutManager2::ToggleMaximized() {
-  if (num_browser_windows() < 2)
+  SetLayoutMode(
+      maximized() && num_browser_windows() >= 2 ?
+        WM_IPC_LAYOUT_OVERLAPPING :
+        WM_IPC_LAYOUT_MAXIMIZED,
+      true);
+}
+
+void LayoutManager2::SetLayoutMode(WmIpcLayoutMode mode,
+                                   bool arrange_browsers) {
+  if (mode != WM_IPC_LAYOUT_MAXIMIZED && mode != WM_IPC_LAYOUT_OVERLAPPING) {
+    LOG(WARNING) << "Ignoring request to set unknown layout mode " << mode;
     return;
+  }
+
+  if (mode == layout_mode_)
+    return;
+
+  if (mode != WM_IPC_LAYOUT_MAXIMIZED && num_browser_windows() < 2) {
+    LOG(WARNING) << "Ignoring request to set non-maximized layout mode " << mode
+                 << " with " << num_browser_windows() << " window(s)";
+    return;
+  }
 
   if (fullscreen_browser_)
     SetFullscreenBrowserWindow(NULL);
 
-  maximized_ = !maximized_;
+  const WmIpcLayoutMode old_mode = layout_mode_;
+  layout_mode_ = mode;
+
+  wm_->xconn()->SetIntProperty(
+      wm_->root(),
+      wm_->GetXAtom(ATOM_CHROME_LAYOUT_MODE),
+      wm_->GetXAtom(ATOM_CARDINAL),
+      layout_mode_);
+
+  if (!arrange_browsers || browser_windows_.empty())
+    return;
 
   BrowserWindow* active_browser = GetActiveBrowserWindow();
   Window* active_win = active_browser->win();
 
-  if (maximized_) {
+  if (mode == WM_IPC_LAYOUT_MAXIMIZED) {
     // If we're switching to maximized, resize the active browser window to
     // cover the whole screen first and wait for it to get redrawn before
     // arranging any of the other windows -- we don't want them to be visible
@@ -1046,10 +1094,10 @@ void LayoutManager2::ToggleMaximized() {
       windows_blocking_arrange_.insert(active_win);
       anim_ms_for_pending_arrange_ = 0;
     }
-  } else {
-    // If we're switching to non-maximized, resize all of the other browser
-    // windows first so they'll be in place when the active browser is resized
-    // to not cover the whole screen.
+  } else if (old_mode == WM_IPC_LAYOUT_MAXIMIZED) {
+    // If we're switching to a non-maximized mode, resize all of the other
+    // browser windows first so they'll be in place when the active browser is
+    // resized to not cover the whole screen.
     ArrangeBrowserWindows(ARRANGE_INACTIVE_BROWSERS,
                           ASSIGN_FOCUS_DURING_ARRANGE, GetCurrentXTime(), 0);
     for (int i = 0; i < num_browser_windows(); ++i) {
@@ -1074,7 +1122,7 @@ void LayoutManager2::ChangeActiveBrowserUnmaximizedWidth(int new_width) {
     return;
 
   active_browser->set_unmaximized_width(new_width);
-  if (maximized_)
+  if (maximized())
     return;
 
   vector<Rect> bounds;
@@ -1096,7 +1144,7 @@ void LayoutManager2::ResizeActiveBrowserWindowIncrementally(bool to_right) {
   const int max_width = GetMaxUnmaximizedWidth();
   const int min_width = GetMinUnmaximizedWidth();
 
-  if (maximized_) {
+  if (maximized()) {
     if (!should_widen) {
       ChangeActiveBrowserUnmaximizedWidth(max_width);
       ToggleMaximized();
@@ -1135,7 +1183,7 @@ void LayoutManager2::ResizeActiveBrowserWindowIncrementally(bool to_right) {
 }
 
 void LayoutManager2::ConfigureResizeHandle() {
-  if (maximized_ || fullscreen_browser_ || browser_windows_.empty()) {
+  if (maximized() || fullscreen_browser_ || browser_windows_.empty()) {
     wm_->xconn()->ConfigureWindowOffscreen(resize_handle_xid_);
   } else {
     BrowserWindow* browser = GetActiveBrowserWindow();
@@ -1170,7 +1218,7 @@ void LayoutManager2::ConfigureEdgeInputWindows(int left_offscreen_index,
 }
 
 void LayoutManager2::HandleResizeDragStart(const Point& absolute_pos) {
-  if (browser_windows_.empty() || maximized_)
+  if (browser_windows_.empty() || maximized())
     return;
 
   BrowserWindow* active_browser = GetActiveBrowserWindow();

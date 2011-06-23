@@ -100,6 +100,16 @@ class LayoutManager2Test : public BasicWindowManagerTest {
     xconn_->InitButtonReleaseEvent(&event, kResizeXid, Point(dx, 0), 1);
     wm_->HandleEvent(&event);
   }
+
+  // Get the value of the root window's _CHROME_LAYOUT_MODE property, returning
+  // -1 if the property isn't present.
+  int GetLayoutModeProperty() {
+    int value = -1;
+    xconn_->GetIntProperty(xconn_->GetRootWindow(),
+                           xconn_->GetAtomOrDie("_CHROME_LAYOUT_MODE"),
+                           &value);
+    return value;
+  }
 };
 
 // Test that we set windows' horizontally- and vertically-maximized state.
@@ -896,6 +906,88 @@ TEST_F(LayoutManager2Test, ResizeBrowser) {
   EXPECT_GT(info1->bounds.width, old_width);
 }
 
+TEST_F(LayoutManager2Test, SetLayoutMode) {
+  // We should start out in maximized mode.
+  EXPECT_TRUE(layout_manager()->maximized());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, GetLayoutModeProperty());
+
+  XWindow xid1 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid1);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, GetLayoutModeProperty());
+
+  // F5 shouldn't do anything when there's only a single browser.
+  const KeyBindings::KeyCombo kF5KeyCombo(XK_F5, 0);
+  const XTime kEventTime = wm_->GetCurrentTimeFromServer();
+  SendKey(xconn_->GetRootWindow(), kF5KeyCombo, kEventTime, kEventTime);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, GetLayoutModeProperty());
+
+  // After a second window is mapped, we should switch to overlapping mode.
+  XWindow xid2 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid2);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING,
+            layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING, GetLayoutModeProperty());
+
+  // Press F5 to switch to maximized mode.
+  SendKey(xconn_->GetRootWindow(), kF5KeyCombo, kEventTime, kEventTime);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, GetLayoutModeProperty());
+
+  // If we map another window while we already have multiple windows but aren't
+  // maximized (i.e. the user requested maximized mode), we should remain
+  // maximized.
+  XWindow xid3 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid3);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, GetLayoutModeProperty());
+
+  // Press F5 to switch back to overlapping mode.
+  SendKey(xconn_->GetRootWindow(), kF5KeyCombo, kEventTime, kEventTime);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING,
+            layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING, GetLayoutModeProperty());
+
+  // Send a message asking to switch to maximized mode.
+  WmIpc::Message msg(chromeos::WM_IPC_MESSAGE_WM_SET_LAYOUT_MODE);
+  msg.set_param(0, chromeos::WM_IPC_LAYOUT_MAXIMIZED);
+  SendWmIpcMessage(msg);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, GetLayoutModeProperty());
+
+  // Now switch back to overlapping.
+  msg.set_param(0, chromeos::WM_IPC_LAYOUT_OVERLAPPING);
+  SendWmIpcMessage(msg);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING,
+            layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING, GetLayoutModeProperty());
+
+  // Sending a message asking for overlapping mode while we're already in it
+  // shouldn't do anything.
+  SendWmIpcMessage(msg);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING,
+            layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING, GetLayoutModeProperty());
+
+  // Messages with bogus modes should be ignored too.
+  msg.set_param(0, -1);
+  SendWmIpcMessage(msg);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING,
+            layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING, GetLayoutModeProperty());
+
+  // We should automatically go back to maximized mode if we only have a single
+  // window mapped.
+  XEvent event;
+  xconn_->InitUnmapEvent(&event, xid3);
+  wm_->HandleEvent(&event);
+  xconn_->InitUnmapEvent(&event, xid2);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, layout_manager()->layout_mode());
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, GetLayoutModeProperty());
+}
+
 // Test that we maximize and unmaximize individual browser windows in the
 // correct order when changing the layout mode.
 TEST_F(LayoutManager2Test, AvoidJankOnLayoutModeChange) {
@@ -926,11 +1018,10 @@ TEST_F(LayoutManager2Test, AvoidJankOnLayoutModeChange) {
       GetExpectedBoundsForBrowser(
           kRootBounds, SIDE_RIGHT, EDGE_HAS_NO_BROWSER, kInitialWidth);
 
-  // Press Alt-Enter to switch to maximized mode.
-  const KeyBindings::KeyCombo kAltEnterKeyCombo(
-      XK_Return, KeyBindings::kAltMask);
+  // Press F5 to switch to maximized mode.
+  const KeyBindings::KeyCombo kF5KeyCombo(XK_F5, 0);
   const XTime kEventTime = wm_->GetCurrentTimeFromServer();
-  SendKey(xconn_->GetRootWindow(), kAltEnterKeyCombo, kEventTime, kEventTime);
+  SendKey(xconn_->GetRootWindow(), kF5KeyCombo, kEventTime, kEventTime);
   ASSERT_TRUE(layout_manager()->maximized());
 
   // We should resize the second, active browser window immediately, but the
@@ -949,7 +1040,7 @@ TEST_F(LayoutManager2Test, AvoidJankOnLayoutModeChange) {
   // We should update the browsers in the opposite order when exiting maximized
   // mode: the first browser is resized while the second, active browser is left
   // covering the screen.
-  SendKey(xconn_->GetRootWindow(), kAltEnterKeyCombo, kEventTime, kEventTime);
+  SendKey(xconn_->GetRootWindow(), kF5KeyCombo, kEventTime, kEventTime);
   ASSERT_FALSE(layout_manager()->maximized());
   EXPECT_FALSE(layout_manager()->maximized());
   EXPECT_EQ(kLeftUnmaximizedBounds, info1->bounds);
