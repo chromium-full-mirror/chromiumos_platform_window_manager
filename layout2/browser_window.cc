@@ -191,6 +191,10 @@ void BrowserWindow::SetBrightness(double brightness, int anim_ms) {
   dimming_box_->SetOpacity(1.0 - brightness, anim_ms);
 }
 
+double BrowserWindow::GetInstantaneousBrightness() const {
+  return 1.0 - dimming_box_->GetOpacity();
+}
+
 void BrowserWindow::SetStatusAreaDisplayed(bool displayed) {
   if (status_area_displayed_ == displayed)
     return;

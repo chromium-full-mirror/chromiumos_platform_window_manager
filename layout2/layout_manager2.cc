@@ -931,8 +931,14 @@ void LayoutManager2::ArrangeBrowserWindows(
       brightness_anim_ms = 0;
     } else if (i == secondary_browser_index) {
       brightness = kSecondaryBrowserWindowBrightness;
-      if (browser->brightness() == 1.0)
-        brightness_anim_ms = kSecondaryBrowserWindowDimAnimMs;
+      const double current_brightness = browser->GetInstantaneousBrightness();
+      if (current_brightness > kSecondaryBrowserWindowBrightness) {
+        // If we're brighter than the target brightness, dim to it gradually.
+        const double fraction =
+            (current_brightness - kSecondaryBrowserWindowBrightness) /
+            (1.0 - kSecondaryBrowserWindowBrightness);
+        brightness_anim_ms = kSecondaryBrowserWindowDimAnimMs * fraction;
+      }
     } else if (!maximized_ && offscreen) {
       brightness = kEdgeBrowserWindowBrightness;
     }

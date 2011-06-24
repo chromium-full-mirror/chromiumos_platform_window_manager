@@ -97,6 +97,10 @@ class BrowserWindow {
   // window is displayed unmodified; at 0, it's completely black.
   void SetBrightness(double brightness, int anim_ms);
 
+  // Get the window's brightness at this moment (|brightness_| instead contains
+  // the brightness to which we're animating).
+  double GetInstantaneousBrightness() const;
+
   // Show or hide this window's status area.
   void SetStatusAreaDisplayed(bool displayed);
 
