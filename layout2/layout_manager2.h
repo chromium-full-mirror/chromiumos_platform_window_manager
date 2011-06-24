@@ -8,6 +8,7 @@
 #include <gtest/gtest_prod.h>  // for FRIEND_TEST() macro
 
 #include <map>
+#include <set>
 #include <tr1/memory>
 #include <vector>
 
@@ -38,6 +39,7 @@ class LayoutManager2 : public EventConsumer,
   explicit LayoutManager2(WindowManager* wm);
   virtual ~LayoutManager2();
 
+  bool maximized() const { return maximized_; }
   int num_browser_windows() const { return browser_windows_.size(); }
 
   // EventConsumer implementation.
@@ -99,6 +101,7 @@ class LayoutManager2 : public EventConsumer,
   FRIEND_TEST(LayoutManager2Test, InitialBrowserWindow);
   FRIEND_TEST(LayoutManager2Test, MultipleWindowLayout);
   FRIEND_TEST(LayoutManager2Test, ClickToActivateBrowser);
+  FRIEND_TEST(LayoutManager2Test, AvoidJankOnLayoutModeChange);
 
   // Specifies ArrangeBrowserWindows()'s behavior with regard to assigning the
   // input focus.
@@ -112,6 +115,18 @@ class LayoutManager2 : public EventConsumer,
     // focus, and we don't want to immediately steal the focus back from the
     // panel).
     PRESERVE_FOCUS_DURING_ARRANGE,
+  };
+
+  // Specifies the browser windows that ArrangeBrowserWindows() should modify.
+  enum ArrangeSet {
+    // Arrange and restack all browser windows.
+    ARRANGE_ALL_BROWSERS = 0,
+
+    // Arrange only the active browser.  None of the windows are restacked.
+    ARRANGE_ACTIVE_BROWSER,
+
+    // Arrange all but the active browser.  None of the windows are restacked.
+    ARRANGE_INACTIVE_BROWSERS,
   };
 
   // Width used for new windows (although it may be capped).
@@ -195,10 +210,12 @@ class LayoutManager2 : public EventConsumer,
                              int left_offscreen_index,
                              int right_offscreen_index);
 
-  // Arrange all browser windows.  |timestamp| is used to focus the active
-  // window.
-  void ArrangeBrowserWindows(XTime timestamp,
+  // Arrange the browser windows described by |arrange_set|.
+  // |timestamp_for_focus| is used to focus the active window; 0 can be passed
+  // if |focus_policy| is PRESERVE_FOCUS_DURING_ARRANGE.
+  void ArrangeBrowserWindows(ArrangeSet arrange_set,
                              ArrangeFocusPolicy focus_policy,
+                             XTime timestamp_for_focus,
                              int anim_ms);
 
   // Update |active_browser_index_|, along with the new active browser window's
@@ -239,6 +256,12 @@ class LayoutManager2 : public EventConsumer,
   void HandleResizeDragMotion(const Point& pos);
   void HandleResizeDragEnd(const Point& pos);
 
+  // Handle |win| no longer preventing us from arranging all of the browser
+  // windows (either because we've gotten a new pixmap for it after it's been
+  // resized, or because it's been unmapped).  Safe to call even if |win| isn't
+  // in |windows_blocking_arrange_|.
+  void HandleWindowNoLongerBlockingArrange(Window* win);
+
   // Call |browser|'s TakeFocus() method, switching to it if it isn't already
   // focused.  This is useful if one of the browser's transient windows has
   // become modal and we want to make sure that it gets the focus.
@@ -276,13 +299,13 @@ class LayoutManager2 : public EventConsumer,
   // Map from transient window IDs to the browsers owning them.
   std::map<XWindow, BrowserWindow*> transient_xids_to_browsers_;
 
-  // We'll activate this window the next time that HandleWindowPixmapFetch()
-  // is invoked on its behalf.
-  Window* window_to_activate_after_pixmap_fetch_;
+  // Windows that we're currently waiting on (either for them to get a new
+  // pixmap or to get unmapped) before we can arrange the browser windows.
+  std::set<Window*> windows_blocking_arrange_;
 
-  // We'll call ArrangeBrowserWindows() the next time that
-  // HandleWindowPixmapFetch() is invoked on behalf of this window.
-  Window* window_for_arrange_after_pixmap_fetch_;
+  // Duration for arrange animations when ArrangeBrowserWindows() is next called
+  // in response to |windows_blocking_arrange_| becoming empty, in milliseconds.
+  int anim_ms_for_pending_arrange_;
 
   // Input window that can be dragged to resize the active browser window.
   XWindow resize_handle_xid_;

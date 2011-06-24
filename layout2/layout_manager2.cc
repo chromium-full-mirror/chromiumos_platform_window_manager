@@ -47,6 +47,7 @@ using std::make_pair;
 using std::map;
 using std::max;
 using std::min;
+using std::set;
 using std::string;
 using std::tr1::shared_ptr;
 using std::vector;
@@ -111,8 +112,7 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
       active_browser_index_(-1),
       maximized_(true),
       fullscreen_browser_(NULL),
-      window_to_activate_after_pixmap_fetch_(NULL),
-      window_for_arrange_after_pixmap_fetch_(NULL),
+      anim_ms_for_pending_arrange_(0),
       resize_handle_xid_(wm->CreateInputWindow(Rect(-1, -1, 1, 1), 0)),
       left_cursor_(wm_->xconn()->CreateShapedCursor(XC_left_side)),
       right_cursor_(wm_->xconn()->CreateShapedCursor(XC_right_side)),
@@ -176,7 +176,8 @@ void LayoutManager2::HandleScreenResize() {
         ConstrainUnmaximizedWidth(round(ratio * new_size.width)));
   }
   // TODO(derat): Recenter transient windows?
-  ArrangeBrowserWindows(GetCurrentXTime(), PRESERVE_FOCUS_DURING_ARRANGE, 0);
+  ArrangeBrowserWindows(
+      ARRANGE_ALL_BROWSERS, PRESERVE_FOCUS_DURING_ARRANGE, 0, 0);
   last_screen_size_ = new_size;
 }
 
@@ -249,10 +250,7 @@ void LayoutManager2::HandleWindowUnmap(Window* win) {
     return;
 
   const bool had_focus = (win == wm_->focus_manager()->focused_win());
-  if (window_to_activate_after_pixmap_fetch_ == win)
-    window_to_activate_after_pixmap_fetch_ = NULL;
-  if (window_for_arrange_after_pixmap_fetch_ == win)
-    window_for_arrange_after_pixmap_fetch_ = NULL;
+  HandleWindowNoLongerBlockingArrange(win);
   if (fullscreen_browser_ && fullscreen_browser_->win() == win)
     SetFullscreenBrowserWindow(NULL);
 
@@ -274,31 +272,14 @@ void LayoutManager2::HandleWindowUnmap(Window* win) {
 
   SetActiveBrowserWindowIndex(new_index);
   ArrangeBrowserWindows(
-      GetCurrentXTime(),
+      ARRANGE_ALL_BROWSERS,
       had_focus ? ASSIGN_FOCUS_DURING_ARRANGE : PRESERVE_FOCUS_DURING_ARRANGE,
+      had_focus ? GetCurrentXTime() : 0,
       kWindowAnimMs);
 }
 
 void LayoutManager2::HandleWindowPixmapFetch(Window* win) {
-  bool arranged = false;
-
-  if (window_to_activate_after_pixmap_fetch_ == win) {
-    window_to_activate_after_pixmap_fetch_ = NULL;
-    const int index = FindBrowserWindowIndexByWindow(*win);
-    DCHECK_GE(index, 0);
-    SetActiveBrowserWindowIndex(index);
-    ArrangeBrowserWindows(
-        GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, kWindowAnimMs);
-    arranged = true;
-  }
-
-  if (window_for_arrange_after_pixmap_fetch_ == win) {
-    window_for_arrange_after_pixmap_fetch_ = NULL;
-    if (!arranged) {
-      ArrangeBrowserWindows(GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, 0);
-      arranged = true;
-    }
-  }
+  HandleWindowNoLongerBlockingArrange(win);
 }
 
 void LayoutManager2::HandleWindowConfigureRequest(
@@ -340,8 +321,8 @@ void LayoutManager2::HandleButtonPress(XWindow xid,
       SetActiveBrowserWindowIndex(right_offscreen_index);
     else
       LOG(WARNING) << "Unhandled button press in input window " << xid;
-    ArrangeBrowserWindows(
-        timestamp, ASSIGN_FOCUS_DURING_ARRANGE, kWindowAnimMs);
+    ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                          timestamp, kWindowAnimMs);
     return;
   }
 
@@ -375,8 +356,8 @@ void LayoutManager2::HandleButtonPress(XWindow xid,
     TakeFocus(timestamp);
   } else {
     SetActiveBrowserWindowIndex(browser_index);
-    ArrangeBrowserWindows(
-        timestamp, ASSIGN_FOCUS_DURING_ARRANGE, kWindowAnimMs);
+    ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                          timestamp, kWindowAnimMs);
   }
 }
 
@@ -436,7 +417,8 @@ void LayoutManager2::HandleFocusChange() {
   if (fullscreen_browser_ &&
       !fullscreen_browser_->IsWindowOrTransientFocused()) {
     SetFullscreenBrowserWindow(NULL);
-    ArrangeBrowserWindows(GetCurrentXTime(), PRESERVE_FOCUS_DURING_ARRANGE, 0);
+    ArrangeBrowserWindows(
+        ARRANGE_ALL_BROWSERS, PRESERVE_FOCUS_DURING_ARRANGE, 0, 0);
   }
 }
 
@@ -644,16 +626,15 @@ void LayoutManager2::HandleBrowserWindowMap(Window* win) {
   else if (fullscreen_browser_)
     SetFullscreenBrowserWindow(NULL);
 
-  // If the window is ready to be composited, activate it now.
-  // Otherwise, wait until we've fetched its pixmap.
-  if (win->has_initial_pixmap() || active_browser_index_ < 0) {
-    const int anim_ms = num_browser_windows() > 1 ? kWindowAnimMs : 0;
-    SetActiveBrowserWindowIndex(index);
-    ArrangeBrowserWindows(
-        GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, anim_ms);
-  } else {
-    window_to_activate_after_pixmap_fetch_ = win;
+  const int anim_ms = num_browser_windows() > 1 ? kWindowAnimMs : 0;
+  if (active_browser_index_ >= 0 && !win->has_initial_pixmap()) {
+    windows_blocking_arrange_.insert(win);
+    anim_ms_for_pending_arrange_ = anim_ms;
   }
+
+  SetActiveBrowserWindowIndex(index);
+  ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                        GetCurrentXTime(), anim_ms);
 
   if (!first_browser_window_mapped_) {
     HandleFirstBrowserWindowMapped(win);
@@ -863,8 +844,14 @@ void LayoutManager2::RestackBrowserWindows(
 }
 
 void LayoutManager2::ArrangeBrowserWindows(
-    XTime timestamp, ArrangeFocusPolicy focus_policy, int anim_ms) {
+    ArrangeSet arrange_set,
+    ArrangeFocusPolicy focus_policy,
+    XTime timestamp_for_focus,
+    int anim_ms) {
   if (browser_windows_.empty())
+    return;
+
+  if (!windows_blocking_arrange_.empty())
     return;
 
   vector<Rect> bounds;
@@ -886,13 +873,13 @@ void LayoutManager2::ArrangeBrowserWindows(
     fullscreen_browser_->SetBrightness(1.0, 0);
     fullscreen_browser_->SetTransientWindowVisibility(true);
     if (focus_policy == ASSIGN_FOCUS_DURING_ARRANGE)
-      fullscreen_browser_->TakeFocus(timestamp);
+      fullscreen_browser_->TakeFocus(timestamp_for_focus);
   }
 
   BrowserWindow* active_browser = GetActiveBrowserWindow();
   DCHECK(active_browser);
   if (focus_policy == ASSIGN_FOCUS_DURING_ARRANGE && !fullscreen_browser_)
-    active_browser->TakeFocus(timestamp);
+    active_browser->TakeFocus(timestamp_for_focus);
 
   int secondary_browser_index = -1;
   if (!maximized_ && num_browser_windows() > 1) {
@@ -902,32 +889,36 @@ void LayoutManager2::ArrangeBrowserWindows(
     DCHECK_LT(secondary_browser_index, num_browser_windows());
   }
 
-  RestackBrowserWindows(secondary_browser_index,
-                        left_offscreen_index,
-                        right_offscreen_index);
+  if (arrange_set == ARRANGE_ALL_BROWSERS)
+    RestackBrowserWindows(secondary_browser_index,
+                          left_offscreen_index,
+                          right_offscreen_index);
 
   for (int i = 0; i < num_browser_windows(); ++i) {
     BrowserWindow* browser = browser_windows_[i].get();
+    const bool active = (i == active_browser_index_);
 
     if (browser == fullscreen_browser_)
       continue;
 
-    browser->SetTransientWindowVisibility(
-        browser == active_browser && !fullscreen_browser_);
+    if ((arrange_set == ARRANGE_ACTIVE_BROWSER && !active) ||
+        (arrange_set == ARRANGE_INACTIVE_BROWSERS && active))
+      continue;
+
+    browser->SetTransientWindowVisibility(active && !fullscreen_browser_);
 
     // Is the window either partially or entirely offscreen?
     const bool offscreen =
-        (maximized_ && i != active_browser_index_) ||
+        (maximized_ && !active) ||
         (left_offscreen_index >= 0 && i <= left_offscreen_index) ||
         (right_offscreen_index >= 0 && i >= right_offscreen_index);
 
     // Is the window onscreen and extending to the right edge (disregarding any
     // sliver of a window that we may be showing at the edge of the screen)?
     const bool on_right =
-        (maximized_ && i == active_browser_index_) ||
-        (i == active_browser_index_ && !browser->anchored_to_left()) ||
-        (i != active_browser_index_ && !offscreen &&
-         active_browser->anchored_to_left());
+        (maximized_ && active) ||
+        (active && !browser->anchored_to_left()) ||
+        (!active && !offscreen && active_browser->anchored_to_left());
     browser->SetStatusAreaDisplayed(on_right);
 
     browser->SetMaximizedProperty(maximized_);
@@ -936,7 +927,7 @@ void LayoutManager2::ArrangeBrowserWindows(
     double brightness = 1.0;
     int brightness_anim_ms = anim_ms;
 
-    if (i == active_browser_index_) {
+    if (active) {
       brightness_anim_ms = 0;
     } else if (i == secondary_browser_index) {
       brightness = kSecondaryBrowserWindowBrightness;
@@ -951,10 +942,6 @@ void LayoutManager2::ArrangeBrowserWindows(
 
   ConfigureResizeHandle();
   ConfigureEdgeInputWindows(left_offscreen_index, right_offscreen_index);
-
-  // If there's a pending request to arrange the windows after a particular
-  // window gets updated, there's no need to honor it now.
-  window_for_arrange_after_pixmap_fetch_ = NULL;
 }
 
 void LayoutManager2::SetActiveBrowserWindowIndex(int browser_index) {
@@ -1014,8 +1001,8 @@ void LayoutManager2::CycleActiveBrowserWindow(bool forward) {
       num_browser_windows();
   const int anim_ms = GetWindowAnimationMs(new_index);
   SetActiveBrowserWindowIndex(new_index);
-  ArrangeBrowserWindows(
-      GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, anim_ms);
+  ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                        GetCurrentXTime(), anim_ms);
 }
 
 void LayoutManager2::ActivateBrowserWindowByIndex(int browser_index) {
@@ -1026,8 +1013,8 @@ void LayoutManager2::ActivateBrowserWindowByIndex(int browser_index) {
 
   const int anim_ms = GetWindowAnimationMs(browser_index);
   SetActiveBrowserWindowIndex(browser_index);
-  ArrangeBrowserWindows(
-      GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, anim_ms);
+  ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                        GetCurrentXTime(), anim_ms);
 }
 
 void LayoutManager2::ToggleMaximized() {
@@ -1042,30 +1029,36 @@ void LayoutManager2::ToggleMaximized() {
   BrowserWindow* active_browser = GetActiveBrowserWindow();
   Window* active_win = active_browser->win();
 
-  if (maximized_)
-    active_browser->SetStatusAreaDisplayed(true);
-
-  // Resize the active window first.
-  vector<Rect> bounds;
-  ComputeBrowserWindowBounds(&bounds, NULL, NULL);
-  scoped_ptr<WindowManager::ScopedCompositingRequest> comp_request(
-      !maximized_ ? wm_->CreateScopedCompositingRequest() : NULL);
-  active_browser->SetMaximizedProperty(maximized_);
-  active_browser->SetBounds(bounds[active_browser_index_], 0);
-
-  if (!maximized_ || active_win->client_has_redrawn_after_last_resize()) {
-    // Resize and arrange the other windows if we're unmaximizing or if the
-    // active window has already been repainted after the resize (being
-    // repainted already is basically impossible here; it will only be true if
-    // the window doesn't support _NET_WM_SYNC_REQUEST).
-    ArrangeBrowserWindows(GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, 0);
+  if (maximized_) {
+    // If we're switching to maximized, resize the active browser window to
+    // cover the whole screen first and wait for it to get redrawn before
+    // arranging any of the other windows -- we don't want them to be visible
+    // moving around in the background.
+    ArrangeBrowserWindows(ARRANGE_ACTIVE_BROWSER, ASSIGN_FOCUS_DURING_ARRANGE,
+                          GetCurrentXTime(), 0);
+    if (!active_win->client_has_redrawn_after_last_resize()) {
+      windows_blocking_arrange_.insert(active_win);
+      anim_ms_for_pending_arrange_ = 0;
+    }
   } else {
-    // Otherwise, wait to update the other windows until after the active window
-    // has been repainted.  If we updated them immediately, there would be an
-    // ugly moment where the active window isn't yet repainted at its maximized
-    // size but the other windows are moved away, leaving a black area onscreen.
-    window_for_arrange_after_pixmap_fetch_ = active_browser->win();
+    // If we're switching to non-maximized, resize all of the other browser
+    // windows first so they'll be in place when the active browser is resized
+    // to not cover the whole screen.
+    ArrangeBrowserWindows(ARRANGE_INACTIVE_BROWSERS,
+                          ASSIGN_FOCUS_DURING_ARRANGE, GetCurrentXTime(), 0);
+    for (int i = 0; i < num_browser_windows(); ++i) {
+      if (i == active_browser_index_)
+        continue;
+      BrowserWindow* browser = browser_windows_[i].get();
+      if (!browser->win()->client_has_redrawn_after_last_resize()) {
+        windows_blocking_arrange_.insert(browser->win());
+        anim_ms_for_pending_arrange_ = 0;
+      }
+    }
   }
+
+  ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                        GetCurrentXTime(), 0);
 }
 
 void LayoutManager2::ChangeActiveBrowserUnmaximizedWidth(int new_width) {
@@ -1220,18 +1213,30 @@ void LayoutManager2::HandleResizeDragEnd(const Point& absolute_pos) {
   ChangeActiveBrowserUnmaximizedWidth(ConstrainUnmaximizedWidth(new_width));
 }
 
+void LayoutManager2::HandleWindowNoLongerBlockingArrange(Window* win) {
+  set<Window*>::iterator it = windows_blocking_arrange_.find(win);
+  if (it == windows_blocking_arrange_.end())
+    return;
+
+  windows_blocking_arrange_.erase(it);
+  if (windows_blocking_arrange_.empty())
+    ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                          GetCurrentXTime(), anim_ms_for_pending_arrange_);
+}
+
 void LayoutManager2::FocusBrowserWindow(BrowserWindow* browser) {
   if (fullscreen_browser_ && browser != fullscreen_browser_) {
     SetFullscreenBrowserWindow(NULL);
-    ArrangeBrowserWindows(GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, 0);
+    ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                          GetCurrentXTime(), 0);
   }
 
   if (browser == GetActiveBrowserWindow()) {
     browser->TakeFocus(GetCurrentXTime());
   } else {
     SetActiveBrowserWindowIndex(GetBrowserWindowIndex(*browser));
-    ArrangeBrowserWindows(
-        GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, kWindowAnimMs);
+    ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                          GetCurrentXTime(), kWindowAnimMs);
   }
 }
 
@@ -1246,7 +1251,6 @@ void LayoutManager2::SetFullscreenBrowserWindow(BrowserWindow* browser) {
 
   if (browser) {
     browser->SetFullscreenProperty(true);
-    browser->SetBounds(wm_->root_bounds(), 0);
     fullscreen_browser_ = browser;
   }
 }
@@ -1259,19 +1263,21 @@ void LayoutManager2::HandleFullscreenRequest(Window* win, bool fullscreen) {
   DLOG(INFO) << "Got _NET_WM_STATE request to make " << win->xid_str()
              << (fullscreen ? " fullscreen" : " not fullscreen");
 
-
   if (!fullscreen && fullscreen_browser_ == browser) {
     SetFullscreenBrowserWindow(NULL);
   } else if (fullscreen) {
-    scoped_ptr<WindowManager::ScopedCompositingRequest> comp_request(
-        wm_->CreateScopedCompositingRequest());
     SetFullscreenBrowserWindow(browser);
+    SetActiveBrowserWindowIndex(GetBrowserWindowIndex(*browser));
+    ArrangeBrowserWindows(ARRANGE_ACTIVE_BROWSER, ASSIGN_FOCUS_DURING_ARRANGE,
+                          GetCurrentXTime(), 0);
+    if (!win->client_has_redrawn_after_last_resize()) {
+      windows_blocking_arrange_.insert(win);
+      anim_ms_for_pending_arrange_ = 0;
+    }
   }
 
-  if (fullscreen && !win->client_has_redrawn_after_last_resize())
-    window_for_arrange_after_pixmap_fetch_ = win;
-  else
-    ArrangeBrowserWindows(GetCurrentXTime(), ASSIGN_FOCUS_DURING_ARRANGE, 0);
+  ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                        GetCurrentXTime(), 0);
 }
 
 void LayoutManager2::HandleModalityRequest(Window* win, bool modal) {
@@ -1313,8 +1319,8 @@ void LayoutManager2::HandleActiveWindowRequest(Window* win, XTime timestamp) {
     FocusBrowserWindow(browser_windows_[index].get());
   } else {
     SetActiveBrowserWindowIndex(index);
-    ArrangeBrowserWindows(
-        timestamp, ASSIGN_FOCUS_DURING_ARRANGE, kWindowAnimMs);
+    ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                          timestamp, kWindowAnimMs);
   }
 }
 

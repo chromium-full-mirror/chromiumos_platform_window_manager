@@ -896,6 +896,73 @@ TEST_F(LayoutManager2Test, ResizeBrowser) {
   EXPECT_GT(info1->bounds.width, old_width);
 }
 
+// Test that we maximize and unmaximize individual browser windows in the
+// correct order when changing the layout mode.
+TEST_F(LayoutManager2Test, AvoidJankOnLayoutModeChange) {
+  // Create and map two windows that support _NET_WM_SYNC_REQUEST.
+  XWindow xid1 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info1 = xconn_->GetWindowInfoOrDie(xid1);
+  ConfigureWindowForSyncRequestProtocol(xid1);
+  SendInitialEventsForWindow(xid1);
+  SendSyncRequestProtocolAlarm(xid1);
+
+  XWindow xid2 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info2 = xconn_->GetWindowInfoOrDie(xid2);
+  ConfigureWindowForSyncRequestProtocol(xid2);
+  SendInitialEventsForWindow(xid2);
+  SendSyncRequestProtocolAlarm(xid2);
+
+  ASSERT_FALSE(layout_manager()->maximized());
+
+  const int kInitialWidth = layout_manager()->GetInitialUnmaximizedWidth();
+
+  const Rect kRootBounds = xconn_->root_bounds();
+  const Rect kLeftOffscreenBounds(
+      Point(0 - kRootBounds.width, 0), kRootBounds.size());
+  const Rect kLeftUnmaximizedBounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_LEFT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+  const Rect kRightUnmaximizedBounds =
+      GetExpectedBoundsForBrowser(
+          kRootBounds, SIDE_RIGHT, EDGE_HAS_NO_BROWSER, kInitialWidth);
+
+  // Press Alt-Enter to switch to maximized mode.
+  const KeyBindings::KeyCombo kAltEnterKeyCombo(
+      XK_Return, KeyBindings::kAltMask);
+  const XTime kEventTime = wm_->GetCurrentTimeFromServer();
+  SendKey(xconn_->GetRootWindow(), kAltEnterKeyCombo, kEventTime, kEventTime);
+  ASSERT_TRUE(layout_manager()->maximized());
+
+  // We should resize the second, active browser window immediately, but the
+  // first should remain in its non-maximized position and size.
+  EXPECT_EQ(xid2, xconn_->focused_xid());
+  EXPECT_EQ(kLeftUnmaximizedBounds, info1->bounds);
+  EXPECT_EQ(kRootBounds, info2->bounds);
+
+  // After we're notified that the second window has been repainted, we should
+  // resize the first.
+  SendSyncRequestProtocolAlarm(xid2);
+  EXPECT_EQ(kLeftOffscreenBounds, info1->bounds);
+  EXPECT_EQ(kRootBounds, info2->bounds);
+  SendSyncRequestProtocolAlarm(xid1);
+
+  // We should update the browsers in the opposite order when exiting maximized
+  // mode: the first browser is resized while the second, active browser is left
+  // covering the screen.
+  SendKey(xconn_->GetRootWindow(), kAltEnterKeyCombo, kEventTime, kEventTime);
+  ASSERT_FALSE(layout_manager()->maximized());
+  EXPECT_FALSE(layout_manager()->maximized());
+  EXPECT_EQ(kLeftUnmaximizedBounds, info1->bounds);
+  EXPECT_EQ(kRootBounds, info2->bounds);
+
+  // After the first browser has been redrawn, the second browser should be
+  // unmaximized.
+  SendSyncRequestProtocolAlarm(xid1);
+  EXPECT_EQ(kLeftUnmaximizedBounds, info1->bounds);
+  EXPECT_EQ(kRightUnmaximizedBounds, info2->bounds);
+  SendSyncRequestProtocolAlarm(xid2);
+}
+
 }  // namespace window_manager
 
 int main(int argc, char** argv) {
