@@ -75,9 +75,9 @@ const int kNumIncrementalResizeSteps = 2;
 // incremental resize amount.
 const double kIncrementalResizeMinChangePercent = 0.25;
 
-// How many pixels should we reserve for the status area?  This sets the maximum
-// size that a browser window can be in its non-maximized state.
-const int kStatusWidthPixels = 200;
+// How many pixels should we reserve for the status area?  This affects the
+// maximum size that a browser window can be in its non-maximized state.
+const int kStatusWidthPixels = 180;
 
 // Size of the invisible resize handle that can be dragged to resize the active
 // browser window in non-maximized mode.

@@ -5,6 +5,7 @@
 #include "window_manager/layout2/browser_window.h"
 
 #include <map>
+#include <string>
 
 #include "base/time.h"
 #include "cros/chromeos_wm_ipc_enums.h"
@@ -21,6 +22,7 @@
 
 using base::TimeDelta;
 using std::map;
+using std::string;
 
 namespace {
 
@@ -65,6 +67,7 @@ BrowserWindow::BrowserWindow(Window* win,
   win_->SetVisibility(Window::VISIBILITY_SHOWN);
   win_->SetShadowType(Shadow::TYPE_RECTANGULAR);
 
+  dimming_box_->SetName(string("dimming box for window ") + win_->xid_str());
   dimming_box_->Move(win_->client_x(), win_->client_y(), 0);
   dimming_box_->SetOpacity(0, 0);
   wm()->stage()->AddActor(dimming_box_.get());

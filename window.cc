@@ -1459,6 +1459,7 @@ void Window::UpdateDamageDebugging(const Rect& bounding_box) {
         wm_->compositor()->CreateColoredBox(
             bounding_box.width, bounding_box.height,
             Compositor::Color(kDamageDebugColor)));
+    debug_actor->SetName("damage debug actor");
     damage_debug_group_->AddActor(debug_actor.get());
     debug_actor->Show();
   } else {
