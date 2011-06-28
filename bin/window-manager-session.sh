@@ -26,7 +26,6 @@ exec "${WM}"                                                            \
   --logged_in_screenshot_output_dir="${LOGGED_IN_SCREENSHOT_DIR}"       \
   --logged_out_log_dir="${LOGGED_OUT_LOG_DIR}"                          \
   --logged_out_screenshot_output_dir="${LOGGED_OUT_SCREENSHOT_DIR}"     \
-  --multiple_windows=false                                              \
   --panel_anchor_image="${IMAGES}/panel_anchor.png"                     \
   --panel_dock_background_image="${IMAGES}/panel_dock_bg.png"           \
   --panel_content_shadow_image_dir="${IMAGES}/panel_content_shadow"     \
