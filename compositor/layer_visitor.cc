@@ -107,20 +107,46 @@ static LayerVisitor::BoundingBox MapRegionToGlCoordinates(
 }
 
 // The output region is defined in the screen coordinates.
-static Rect MapGlCoordinatesToClipRect(const LayerVisitor::BoundingBox& box,
-                                       int stage_width,
-                                       int stage_height) {
-  Rect region;
+static LayerVisitor::BoundingBox MapGlCoordinatesToStage(
+    const LayerVisitor::BoundingBox& box,
+    int stage_width,
+    int stage_height) {
   float x_min = (box.x_min + 1.f) / 2.f * stage_width;
   float y_min = (box.y_min + 1.f) / 2.f * stage_height;
   float x_max = (box.x_max + 1.f) / 2.f * stage_width;
   float y_max = (box.y_max + 1.f) / 2.f * stage_height;
-  region.x = static_cast<int>(x_min);
-  region.y = static_cast<int>(y_min);
+  return LayerVisitor::BoundingBox(x_min, x_max, y_min, y_max);
+}
+
+// Output is rounded such that screen aligned regions are preserved properly.
+static Rect MapGlCoordinatesToClipRect(const LayerVisitor::BoundingBox& box,
+                                       int stage_width,
+                                       int stage_height) {
+  LayerVisitor::BoundingBox stage_box(MapGlCoordinatesToStage(box,
+                                                              stage_width,
+                                                              stage_height));
+  Rect region;
+  region.x = static_cast<int>(stage_box.x_min + .5f);
+  region.y = static_cast<int>(stage_box.y_min + .5f);
+  region.width = static_cast<int>(stage_box.x_max + .5f) - region.x;
+  region.height = static_cast<int>(stage_box.y_max + .5f) - region.y;
+  return region;
+}
+
+// Output is rounded such that all partially covered pixels are included.
+static Rect MapGlCoordinatesToBounds(const LayerVisitor::BoundingBox& box,
+                                     int stage_width,
+                                     int stage_height) {
+  LayerVisitor::BoundingBox stage_box(MapGlCoordinatesToStage(box,
+                                                              stage_width,
+                                                              stage_height));
+  Rect region;
   // Important: To be properly conservative, the differences below need to
   // happen after the conversion to int.
-  region.width = static_cast<int>(ceil(x_max)) - region.x;
-  region.height = static_cast<int>(ceil(y_max)) - region.y;
+  region.x = static_cast<int>(stage_box.x_min);
+  region.y = static_cast<int>(stage_box.y_min);
+  region.width = static_cast<int>(ceil(stage_box.x_max)) - region.x;
+  region.height = static_cast<int>(ceil(stage_box.y_max)) - region.y;
   return region;
 }
 
@@ -188,11 +214,11 @@ void LayerVisitor::VisitTexturedQuadActor(
 
   CullingResult result = PerformActorCullingTest(box);
 
-  Rect rect(MapGlCoordinatesToClipRect(box,
+  Rect bounds(MapGlCoordinatesToBounds(box,
                                        stage_actor_->width(),
                                        stage_actor_->height()));
   Region clip(visiting_clip_);
-  clip.Intersect(rect);
+  clip.Intersect(bounds);
 
   actor->set_clip(clip);
   actor->set_culled(result == CULLING_WINDOW_OFFSCREEN);
@@ -208,8 +234,12 @@ void LayerVisitor::VisitTexturedQuadActor(
 
   // Subtract opaque screen aligned quads from clip region to avoid
   // unnecessary drawing of occluded actors.
-  if (actor->is_opaque() && quad_is_screen_aligned)
+  if (actor->is_opaque() && quad_is_screen_aligned) {
+    Rect rect(MapGlCoordinatesToClipRect(box,
+                                         stage_actor_->width(),
+                                         stage_actor_->height()));
     visiting_clip_.Subtract(rect);
+  }
 
   visiting_top_visible_actor_ = false;
 }
@@ -249,9 +279,9 @@ void LayerVisitor::VisitTexturePixmap(
           *stage_actor_,
           *actor,
           *iterator);
-      damaged_region_.Unite(MapGlCoordinatesToClipRect(region,
-                                                       stage_actor_->width(),
-                                                       stage_actor_->height()));
+      damaged_region_.Unite(MapGlCoordinatesToBounds(region,
+                                                     stage_actor_->width(),
+                                                     stage_actor_->height()));
     }
   }
   actor->ResetDamagedRegion();
