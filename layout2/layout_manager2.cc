@@ -356,15 +356,18 @@ void LayoutManager2::HandleButtonPress(XWindow xid,
     browser->SetPreferredTransientWindowToFocus(NULL);
   }
 
-  // If the click happened in the active browser, then we're probably stealing
-  // the focus from a panel or something.
-  DCHECK_NE(browser_index, -1);
-  if (browser_index == active_browser_index_) {
-    TakeFocus(timestamp);
-  } else {
-    SetActiveBrowserWindowIndex(browser_index);
-    ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
-                          timestamp, kWindowAnimMs);
+  // Avoid focusing a browser in response to clicks within its status area.
+  if (!win->status_bounds().contains_point(relative_pos)) {
+    DCHECK_NE(browser_index, -1);
+    if (browser_index == active_browser_index_) {
+      // If the click happened in the active browser, then we're probably
+      // stealing the focus from a panel or something.
+      TakeFocus(timestamp);
+    } else {
+      SetActiveBrowserWindowIndex(browser_index);
+      ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
+                            timestamp, kWindowAnimMs);
+    }
   }
 }
 

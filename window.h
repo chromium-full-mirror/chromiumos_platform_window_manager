@@ -153,6 +153,7 @@ class Window {
   bool wm_state_maximized_vert() const { return wm_state_maximized_vert_; }
   bool wm_state_modal() const { return wm_state_modal_; }
   bool wm_hint_urgent() const { return wm_hint_urgent_; }
+  const Rect& status_bounds() const { return status_bounds_; }
   const std::string& client_hostname() const { return client_hostname_; }
   int client_pid() const { return client_pid_; }
 
@@ -212,6 +213,10 @@ class Window {
   // Fetch the window's _CHROME_STATE property and update our internal copy
   // of it.
   void FetchAndApplyChromeState();
+
+  // Fetch the window's _CHROME_STATUS_BOUNDS property and update
+  // |status_bounds_|.
+  void FetchAndApplyChromeStatusBounds();
 
   // Fetch the window's WM_CLIENT_MACHINE property and update
   // |client_hostname_|.
@@ -708,6 +713,10 @@ class Window {
   // Chrome window state, as exposed in the window's _CHROME_STATE
   // property.
   std::set<XAtom> chrome_state_xatoms_;
+
+  // Local bounds of the window's status area (clock, battery, etc.) as reported
+  // by the _CHROME_STATUS_BOUNDS property.
+  Rect status_bounds_;
 
   // Damage object used to track changes to |xid_|.
   XID damage_;

@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "base/file_path.h"
 #include "base/file_util.h"
@@ -28,6 +29,7 @@ DECLARE_string(initial_chrome_window_mapped_file);
 DECLARE_bool(multiple_windows);
 
 using std::string;
+using std::vector;
 
 namespace window_manager {
 
@@ -1052,6 +1054,57 @@ TEST_F(LayoutManager2Test, AvoidJankOnLayoutModeChange) {
   EXPECT_EQ(kLeftUnmaximizedBounds, info1->bounds);
   EXPECT_EQ(kRightUnmaximizedBounds, info2->bounds);
   SendSyncRequestProtocolAlarm(xid2);
+}
+
+TEST_F(LayoutManager2Test, DontFocusForClickInStatusArea) {
+  const XAtom kStatusBoundsAtom = xconn_->GetAtomOrDie("_CHROME_STATUS_BOUNDS");
+  const XAtom kCardinalAtom = xconn_->GetAtomOrDie("CARDINAL");
+
+  // Create two browser windows and set a property describing the first's status
+  // area's bounds.
+  XWindow xid1 = CreateSimpleWindow();
+  vector<int> values;
+  values.push_back(10);
+  values.push_back(10);
+  values.push_back(20);
+  values.push_back(20);
+  xconn_->SetIntArrayProperty(xid1, kStatusBoundsAtom, kCardinalAtom, values);
+  SendInitialEventsForWindow(xid1);
+
+  XWindow xid2 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid2);
+  ASSERT_EQ(xid2, xconn_->focused_xid());
+
+  // A click within the first browser's status area shouldn't focus it.
+  XEvent event;
+  xconn_->InitButtonPressEvent(&event, xid1, Point(15, 15), 1);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(xid2, xconn_->focused_xid());
+
+  // If we click outside of the status area, the browser should be focused.
+  xconn_->InitButtonPressEvent(&event, xid1, Point(5, 5), 1);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(xid1, xconn_->focused_xid());
+
+  // Set the property on the second browser and let WM know that it changed.
+  values.clear();
+  values.push_back(50);
+  values.push_back(60);
+  values.push_back(20);
+  values.push_back(10);
+  xconn_->SetIntArrayProperty(xid2, kStatusBoundsAtom, kCardinalAtom, values);
+  xconn_->InitPropertyNotifyEvent(&event, xid2, kStatusBoundsAtom);
+  wm_->HandleEvent(&event);
+
+  // Click inside of the status area.
+  xconn_->InitButtonPressEvent(&event, xid2, Point(60, 65), 1);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(xid1, xconn_->focused_xid());
+
+  // Click outside of the status area.
+  xconn_->InitButtonPressEvent(&event, xid2, Point(0, 0), 1);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(xid2, xconn_->focused_xid());
 }
 
 }  // namespace window_manager

@@ -154,6 +154,7 @@ Window::Window(WindowManager* wm,
   FetchAndApplyWmProtocols();
   FetchAndApplyWmState();
   FetchAndApplyChromeState();
+  FetchAndApplyChromeStatusBounds();
   FetchAndApplyTransientHint();
   FetchAndApplyWmHints();
   FetchAndApplyWmWindowType();
@@ -404,6 +405,26 @@ void Window::FetchAndApplyChromeState() {
   }
   DLOG(INFO) << "Fetched " << wm_->GetXAtomName(state_xatom) << " for "
              << xid_str_ << ": " << debug_str;
+}
+
+void Window::FetchAndApplyChromeStatusBounds() {
+  DCHECK(xid_);
+  status_bounds_.reset(0, 0, 0, 0);
+  vector<int> values;
+  if (!wm_->xconn()->GetIntArrayProperty(
+          xid_, wm_->GetXAtom(ATOM_CHROME_STATUS_BOUNDS), &values)) {
+    return;
+  }
+
+  if (values.size() != 4) {
+    LOG(WARNING) << "Got status bounds property for " << xid_str_ << " with "
+                 << values.size() << " value(s) (expected 4)";
+    return;
+  }
+
+  status_bounds_.reset(values[0], values[1], values[2], values[3]);
+  DLOG(INFO) << "Fetched status bounds " << status_bounds_ << " for "
+             << xid_str_;
 }
 
 void Window::FetchAndApplyWmClientMachine() {

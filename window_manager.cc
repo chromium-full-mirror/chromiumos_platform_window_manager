@@ -1834,35 +1834,37 @@ void WindowManager::HandlePropertyNotify(const XPropertyEvent& e) {
     DLOG(INFO) << "Handling property notify for " << win->xid_str() << " about "
                << (deleted ? "deleted " : "") << "property "
                << XidStr(e.atom) << " (" << GetXAtomName(e.atom) << ")";
-    if (e.atom == GetXAtom(ATOM_NET_WM_NAME)) {
-      win->FetchAndApplyTitle();
-    } else if (e.atom == GetXAtom(ATOM_WM_HINTS)) {
-      win->FetchAndApplyWmHints();
-    } else if (e.atom == GetXAtom(ATOM_WM_NORMAL_HINTS)) {
-      win->FetchAndApplySizeHints();
-    } else if (e.atom == GetXAtom(ATOM_WM_TRANSIENT_FOR)) {
-      win->FetchAndApplyTransientHint();
-    } else if (e.atom == GetXAtom(ATOM_WM_PROTOCOLS)) {
-      win->FetchAndApplyWmProtocols();
+    if (e.atom == GetXAtom(ATOM_CHROME_FREEZE_UPDATES)) {
+      win->HandleFreezeUpdatesPropertyChange(!deleted);
+    } else if (e.atom == GetXAtom(ATOM_CHROME_STATUS_BOUNDS)) {
+      win->FetchAndApplyChromeStatusBounds();
     } else if (e.atom == GetXAtom(ATOM_CHROME_WINDOW_TYPE)) {
       win->FetchAndApplyWindowType();
-    } else if (e.atom == GetXAtom(ATOM_NET_WM_WINDOW_TYPE)) {
-      win->FetchAndApplyWmWindowType();
-    } else if (e.atom == GetXAtom(ATOM_NET_WM_WINDOW_OPACITY)) {
-      win->FetchAndApplyWindowOpacity();
-    } else if (e.atom == GetXAtom(ATOM_NET_WM_STATE)) {
-      win->FetchAndApplyWmState();
-    } else if (e.atom == GetXAtom(ATOM_WM_CLIENT_MACHINE)) {
-      win->FetchAndApplyWmClientMachine();
+    } else if (e.atom == GetXAtom(ATOM_NET_WM_NAME)) {
+      win->FetchAndApplyTitle();
     } else if (e.atom == GetXAtom(ATOM_NET_WM_PID)) {
       win->FetchAndApplyWmPid();
+    } else if (e.atom == GetXAtom(ATOM_NET_WM_STATE)) {
+      win->FetchAndApplyWmState();
     } else if (e.atom == GetXAtom(ATOM_NET_WM_SYNC_REQUEST_COUNTER)) {
       // Just re-fetch WM_PROTOCOLS here; this property is sometimes only set
       // after we've already read WM_PROTOCOLS -- see comment #3 at
       // http://crosbug.com/5846.
       win->FetchAndApplyWmProtocols();
-    } else if (e.atom == GetXAtom(ATOM_CHROME_FREEZE_UPDATES)) {
-      win->HandleFreezeUpdatesPropertyChange(!deleted);
+    } else if (e.atom == GetXAtom(ATOM_NET_WM_WINDOW_OPACITY)) {
+      win->FetchAndApplyWindowOpacity();
+    } else if (e.atom == GetXAtom(ATOM_NET_WM_WINDOW_TYPE)) {
+      win->FetchAndApplyWmWindowType();
+    } else if (e.atom == GetXAtom(ATOM_WM_CLIENT_MACHINE)) {
+      win->FetchAndApplyWmClientMachine();
+    } else if (e.atom == GetXAtom(ATOM_WM_HINTS)) {
+      win->FetchAndApplyWmHints();
+    } else if (e.atom == GetXAtom(ATOM_WM_NORMAL_HINTS)) {
+      win->FetchAndApplySizeHints();
+    } else if (e.atom == GetXAtom(ATOM_WM_PROTOCOLS)) {
+      win->FetchAndApplyWmProtocols();
+    } else if (e.atom == GetXAtom(ATOM_WM_TRANSIENT_FOR)) {
+      win->FetchAndApplyTransientHint();
     }
   }
 
