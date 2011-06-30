@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <cmath>
+
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
@@ -27,29 +29,31 @@ TEST_F(AnimationTest, Basic) {
   anim.AppendKeyframe(10.0f, TimeDelta::FromMilliseconds(20));
 
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(-10.0f, anim.GetValue(now));
+  EXPECT_EQ(-10, static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(5);
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(-sqrt(50.0f), anim.GetValue(now));
+  EXPECT_EQ(static_cast<int>(round(-sqrt(50.0f))),
+            static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(10);
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(0.0f, anim.GetValue(now));
+  EXPECT_EQ(0, static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(15);
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(sqrt(50.0f), anim.GetValue(now));
+  EXPECT_EQ(static_cast<int>(round(sqrt(50.0f))),
+            static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(20);
   EXPECT_TRUE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(10.0f, anim.GetValue(now));
+  EXPECT_EQ(10, static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(25);
   EXPECT_TRUE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(10.0f, anim.GetValue(now));
+  EXPECT_EQ(10, static_cast<int>(roundf(anim.GetValue(now))));
 
-  EXPECT_FLOAT_EQ(10.0f, anim.GetEndValue());
+  EXPECT_EQ(10, static_cast<int>(roundf(anim.GetEndValue())));
 }
 
 TEST_F(AnimationTest, MultipleKeyframes) {
@@ -59,23 +63,23 @@ TEST_F(AnimationTest, MultipleKeyframes) {
   anim.AppendKeyframe(60, TimeDelta::FromMilliseconds(20));
 
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(0, anim.GetValue(now));
+  EXPECT_EQ(0, static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(5);
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(10, anim.GetValue(now));
+  EXPECT_EQ(10, static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(10);
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(20, anim.GetValue(now));
+  EXPECT_EQ(20, static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(20);
   EXPECT_FALSE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(40, anim.GetValue(now));
+  EXPECT_EQ(40, static_cast<int>(roundf(anim.GetValue(now))));
 
   now = CreateTimeTicksFromMs(30);
   EXPECT_TRUE(anim.IsDone(now));
-  EXPECT_FLOAT_EQ(60, anim.GetValue(now));
+  EXPECT_EQ(60, static_cast<int>(roundf(anim.GetValue(now))));
 }
 
 }  // namespace window_manager
