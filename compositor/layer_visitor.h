@@ -16,43 +16,6 @@ namespace window_manager {
 // to help RealCompositor and DrawCompositor perform optimizations.
 class LayerVisitor : virtual public RealCompositor::ActorVisitor {
  public:
-  struct BoundingBox {
-    BoundingBox() : x_min(0.0f), x_max(0.0f), y_min(0.0f), y_max(0.0f) {}
-    BoundingBox(float x0, float x1, float y0, float y1)
-        : x_min(x0),
-          x_max(x1),
-          y_min(y0),
-          y_max(y1) {}
-
-    void merge(const BoundingBox& other) {
-      if (other.x_min == other.x_max || other.y_min == other.y_max)
-        return;
-      if (x_min == x_max || y_min == y_max) {
-        x_min = other.x_min;
-        x_max = other.x_max;
-        y_min = other.y_min;
-        y_max = other.y_max;
-      } else {
-        x_min = std::min(x_min, other.x_min);
-        x_max = std::max(x_max, other.x_max);
-        y_min = std::min(y_min, other.y_min);
-        y_max = std::max(y_max, other.y_max);
-      }
-    }
-
-    void clear() {
-      x_min = 0.f;
-      x_max = 0.f;
-      y_min = 0.f;
-      y_max = 0.f;
-    }
-
-    float x_min;
-    float x_max;
-    float y_min;
-    float y_max;
-  };
-
   LayerVisitor(int32 count, bool use_partial_updates)
       : count_(count),
         has_fullscreen_actor_(false),

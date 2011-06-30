@@ -12,12 +12,16 @@
 #include "window_manager/geometry.h"
 #include "window_manager/util.h"
 
-namespace window_manager {
-
 using std::ceil;
 using std::max;
 using std::min;
 using std::vector;
+
+namespace window_manager {
+
+namespace {
+
+const float kBoundingBoxEpsilon = 0.0001;
 
 enum CullingResult {
   CULLING_WINDOW_OFFSCREEN,
@@ -25,34 +29,58 @@ enum CullingResult {
   CULLING_WINDOW_FULLSCREEN
 };
 
-static inline float min4(float a, float b, float c, float d) {
+struct BoundingBox {
+  BoundingBox() : x_min(0.0f), x_max(0.0f), y_min(0.0f), y_max(0.0f) {}
+  BoundingBox(float x0, float x1, float y0, float y1)
+      : x_min(x0),
+        x_max(x1),
+        y_min(y0),
+        y_max(y1) {}
+
+  void merge(const BoundingBox& other) {
+    if (other.x_min == other.x_max || other.y_min == other.y_max)
+      return;
+    if (x_min == x_max || y_min == y_max) {
+      x_min = other.x_min;
+      x_max = other.x_max;
+      y_min = other.y_min;
+      y_max = other.y_max;
+    } else {
+      x_min = std::min(x_min, other.x_min);
+      x_max = std::max(x_max, other.x_max);
+      y_min = std::min(y_min, other.y_min);
+      y_max = std::max(y_max, other.y_max);
+    }
+  }
+
+  void clear() {
+    x_min = 0.f;
+    x_max = 0.f;
+    y_min = 0.f;
+    y_max = 0.f;
+  }
+
+  float x_min;
+  float x_max;
+  float y_min;
+  float y_max;
+};
+
+inline float min4(float a, float b, float c, float d) {
   return min(min(min(a, b), c), d);
 }
 
-static inline float max4(float a, float b, float c, float d) {
+inline float max4(float a, float b, float c, float d) {
   return max(max(max(a, b), c), d);
-}
-
-static inline bool IsBoxOnScreen(const LayerVisitor::BoundingBox& a) {
-  // The window has corners top left (-1, 1) and bottom right (1, -1).
-  return !(a.x_max <= -1.0 || a.x_min >= 1.0 ||
-           a.y_max <= -1.0 || a.y_min >= 1.0);
-}
-
-static inline bool IsBoxFullScreen(const LayerVisitor::BoundingBox& a) {
-  // The bounding box must be equal or greater than the area (-1, 1) - (1, -1)
-  // in case of full screen.
-  return a.x_max >= 1.0 && a.x_min <= -1.0 &&
-         a.y_max >= 1.0 && a.y_min <= -1.0;
 }
 
 // The input region is in window coordinates where top_left is (0, 0) and
 // bottom_right is (1, 1).  Output is the bounding box of the transformed window
 // in GL coordinates where bottom_left is (-1, -1) and top_right is (1, 1).
-static LayerVisitor::BoundingBox ComputeTransformedBoundingBox(
+BoundingBox ComputeTransformedBoundingBox(
     const RealCompositor::StageActor& stage,
     const RealCompositor::QuadActor& actor,
-    const LayerVisitor::BoundingBox& region) {
+    const BoundingBox& region) {
   const Matrix4& transform = stage.projection() * actor.model_view();
 
   Vector4 v0(region.x_min, region.y_min, 0, 1);
@@ -70,25 +98,14 @@ static LayerVisitor::BoundingBox ComputeTransformedBoundingBox(
   v2 /= v2[3];
   v3 /= v3[3];
 
-  return LayerVisitor::BoundingBox(min4(v0[0], v1[0], v2[0], v3[0]),
-                                   max4(v0[0], v1[0], v2[0], v3[0]),
-                                   min4(v0[1], v1[1], v2[1], v3[1]),
-                                   max4(v0[1], v1[1], v2[1], v3[1]));
-}
-
-static CullingResult PerformActorCullingTest(
-  const LayerVisitor::BoundingBox& box) {
-  if (!IsBoxOnScreen(box))
-    return CULLING_WINDOW_OFFSCREEN;
-
-  if (IsBoxFullScreen(box))
-    return CULLING_WINDOW_FULLSCREEN;
-
-  return CULLING_WINDOW_ONSCREEN;
+  return BoundingBox(min4(v0[0], v1[0], v2[0], v3[0]),
+                     max4(v0[0], v1[0], v2[0], v3[0]),
+                     min4(v0[1], v1[1], v2[1], v3[1]),
+                     max4(v0[1], v1[1], v2[1], v3[1]));
 }
 
 // The input region is defined in the actor's window coordinates.
-static LayerVisitor::BoundingBox MapRegionToGlCoordinates(
+BoundingBox MapRegionToGlCoordinates(
     const RealCompositor::StageActor& stage,
     const RealCompositor::TexturePixmapActor& actor,
     const Rect& region) {
@@ -102,29 +119,24 @@ static LayerVisitor::BoundingBox MapRegionToGlCoordinates(
   float y_max = region.y + region.height;
   y_max /= actor.height();
 
-  LayerVisitor::BoundingBox box(x_min, x_max, y_min, y_max);
+  BoundingBox box(x_min, x_max, y_min, y_max);
   return ComputeTransformedBoundingBox(stage, actor, box);
 }
 
 // The output region is defined in the screen coordinates.
-static LayerVisitor::BoundingBox MapGlCoordinatesToStage(
-    const LayerVisitor::BoundingBox& box,
-    int stage_width,
-    int stage_height) {
-  float x_min = (box.x_min + 1.f) / 2.f * stage_width;
-  float y_min = (box.y_min + 1.f) / 2.f * stage_height;
-  float x_max = (box.x_max + 1.f) / 2.f * stage_width;
-  float y_max = (box.y_max + 1.f) / 2.f * stage_height;
-  return LayerVisitor::BoundingBox(x_min, x_max, y_min, y_max);
+BoundingBox MapGlCoordinatesToStage(const BoundingBox& box,
+                                    const Size& stage_size) {
+  float x_min = (box.x_min + 1.f) / 2.f * stage_size.width;
+  float y_min = (box.y_min + 1.f) / 2.f * stage_size.height;
+  float x_max = (box.x_max + 1.f) / 2.f * stage_size.width;
+  float y_max = (box.y_max + 1.f) / 2.f * stage_size.height;
+  return BoundingBox(x_min, x_max, y_min, y_max);
 }
 
 // Output is rounded such that screen aligned regions are preserved properly.
-static Rect MapGlCoordinatesToClipRect(const LayerVisitor::BoundingBox& box,
-                                       int stage_width,
-                                       int stage_height) {
-  LayerVisitor::BoundingBox stage_box(MapGlCoordinatesToStage(box,
-                                                              stage_width,
-                                                              stage_height));
+Rect MapGlCoordinatesToClipRect(const BoundingBox& box,
+                                const Size& stage_size) {
+  const BoundingBox stage_box = MapGlCoordinatesToStage(box, stage_size);
   Rect region;
   region.x = static_cast<int>(stage_box.x_min + .5f);
   region.y = static_cast<int>(stage_box.y_min + .5f);
@@ -134,12 +146,8 @@ static Rect MapGlCoordinatesToClipRect(const LayerVisitor::BoundingBox& box,
 }
 
 // Output is rounded such that all partially covered pixels are included.
-static Rect MapGlCoordinatesToBounds(const LayerVisitor::BoundingBox& box,
-                                     int stage_width,
-                                     int stage_height) {
-  LayerVisitor::BoundingBox stage_box(MapGlCoordinatesToStage(box,
-                                                              stage_width,
-                                                              stage_height));
+Rect MapGlCoordinatesToBounds(const BoundingBox& box, const Size& stage_size) {
+  const BoundingBox stage_box = MapGlCoordinatesToStage(box, stage_size);
   Rect region;
   // Important: To be properly conservative, the differences below need to
   // happen after the conversion to int.
@@ -149,6 +157,28 @@ static Rect MapGlCoordinatesToBounds(const LayerVisitor::BoundingBox& box,
   region.height = static_cast<int>(ceil(stage_box.y_max)) - region.y;
   return region;
 }
+
+bool IsBoxOffscreen(const BoundingBox& box) {
+  static const float kAlmostOne = 1.f - kBoundingBoxEpsilon;
+  return box.x_max <= -kAlmostOne || box.x_min >= kAlmostOne ||
+         box.y_max <= -kAlmostOne || box.y_min >= kAlmostOne;
+}
+
+bool IsBoxFullscreen(const BoundingBox& box) {
+  static const float kAlmostOne = 1.f - kBoundingBoxEpsilon;
+  return box.x_max >= kAlmostOne && box.x_min <= -kAlmostOne &&
+         box.y_max >= kAlmostOne && box.y_min <= -kAlmostOne;
+}
+
+CullingResult PerformActorCullingTest(const BoundingBox& box) {
+  if (IsBoxOffscreen(box))
+    return CULLING_WINDOW_OFFSCREEN;
+  if (IsBoxFullscreen(box))
+    return CULLING_WINDOW_FULLSCREEN;
+  return CULLING_WINDOW_ONSCREEN;
+}
+
+}  // namespace
 
 void LayerVisitor::VisitActor(RealCompositor::Actor* actor) {
   actor->set_is_opaque(actor->opacity() > 0.999f);
@@ -207,16 +237,13 @@ void LayerVisitor::VisitTexturedQuadActor(
   // Must update model view matrix before culling test.
   actor->UpdateModelView();
 
-  static const LayerVisitor::BoundingBox region(0, 1, 0, 1);
+  static const BoundingBox kRegion(0, 1, 0, 1);
+  const BoundingBox box =
+      ComputeTransformedBoundingBox(*stage_actor_, *actor, kRegion);
+  const CullingResult result = PerformActorCullingTest(box);
 
-  LayerVisitor::BoundingBox box =
-      ComputeTransformedBoundingBox(*stage_actor_, *actor, region);
-
-  CullingResult result = PerformActorCullingTest(box);
-
-  Rect bounds(MapGlCoordinatesToBounds(box,
-                                       stage_actor_->width(),
-                                       stage_actor_->height()));
+  const Size stage_size = stage_actor_->GetBounds().size();
+  const Rect bounds = MapGlCoordinatesToBounds(box, stage_size);
   Region clip(visiting_clip_);
   clip.Intersect(bounds);
 
@@ -235,9 +262,7 @@ void LayerVisitor::VisitTexturedQuadActor(
   // Subtract opaque screen aligned quads from clip region to avoid
   // unnecessary drawing of occluded actors.
   if (actor->is_opaque() && quad_is_screen_aligned) {
-    Rect rect(MapGlCoordinatesToClipRect(box,
-                                         stage_actor_->width(),
-                                         stage_actor_->height()));
+    Rect rect = MapGlCoordinatesToClipRect(box, stage_size);
     visiting_clip_.Subtract(rect);
   }
 
@@ -272,16 +297,12 @@ void LayerVisitor::VisitTexturePixmap(
     top_fullscreen_actor_ = actor;
 
   if (use_partial_updates_) {
-    vector<Rect>::const_iterator iterator =
+    const Size stage_size = stage_actor_->GetBounds().size();
+    vector<Rect>::const_iterator it =
         actor->GetDamagedRegion().rects().begin();
-    for (; iterator != actor->GetDamagedRegion().rects().end(); ++iterator) {
-      BoundingBox region = MapRegionToGlCoordinates(
-          *stage_actor_,
-          *actor,
-          *iterator);
-      damaged_region_.Unite(MapGlCoordinatesToBounds(region,
-                                                     stage_actor_->width(),
-                                                     stage_actor_->height()));
+    for (; it != actor->GetDamagedRegion().rects().end(); ++it) {
+      BoundingBox region = MapRegionToGlCoordinates(*stage_actor_, *actor, *it);
+      damaged_region_.Unite(MapGlCoordinatesToBounds(region, stage_size));
     }
   }
   actor->ResetDamagedRegion();
