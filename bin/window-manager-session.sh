@@ -16,7 +16,7 @@ INITIAL_CHROME_FILE="/var/run/state/windowmanager/initial-chrome-window-mapped"
 PROFILE_DIR="${DATA_DIR}/profile"
 LOGGED_IN_LOG_DIR="${HOME}/log"
 LOGGED_OUT_LOG_DIR="/var/log/window_manager"
-LOGGED_IN_SCREENSHOT_DIR="${HOME}/Downloads/Screenshots"
+LOGGED_IN_SCREENSHOT_DIR="${HOME}/Downloads"
 LOGGED_OUT_SCREENSHOT_DIR="/tmp"
 XTERM_COMMAND="/usr/bin/cros-term"
 
