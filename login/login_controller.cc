@@ -945,9 +945,9 @@ void LoginController::DoInitialSetupIfWindowsAreReady() {
     webui_window_->MoveCompositedToClient();
     wm_->stacking_manager()->StackWindowAtTopOfLayer(
         webui_window_,
-        StackingManager::LAYER_LOGIN_OTHER_WINDOW,
+        StackingManager::LAYER_LOGIN_WINDOW,
         StackingManager::SHADOW_DIRECTLY_BELOW_ACTOR,
-        StackingManager::LAYER_LOGIN_OTHER_WINDOW);
+        StackingManager::LAYER_LOGIN_WINDOW);
     webui_window_->SetCompositedOpacity(0, 0);
     webui_window_->ShowComposited();
     webui_window_->SetCompositedOpacity(1, kInitialShowAnimationTimeInMs);
