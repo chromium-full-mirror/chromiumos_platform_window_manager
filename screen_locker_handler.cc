@@ -305,6 +305,8 @@ void ScreenLockerHandler::HandleUnlocked() {
   // if they hold the power button and we start shutting down, we'll grab a new
   // snapshot for the fast-close animation.
   DestroySnapshotAndUpdateVisibilityGroup();
+
+  wm_->TakeFocus(wm_->GetCurrentTimeFromServer());
 }
 
 void ScreenLockerHandler::HandlePreShutdown() {

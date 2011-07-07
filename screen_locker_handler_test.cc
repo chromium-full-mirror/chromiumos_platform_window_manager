@@ -189,6 +189,10 @@ TEST_F(ScreenLockerHandlerTest, BasicLock) {
   xconn_->InitUnmapEvent(&event, screen_locker_xid);
   wm_->HandleEvent(&event);
   EXPECT_TRUE(compositor_->active_visibility_groups().empty());
+
+  // We should also refocus the original window.
+  EXPECT_EQ(toplevel_xid, xconn_->focused_xid());
+  EXPECT_EQ(toplevel_xid, GetActiveWindowProperty());
 }
 
 TEST_F(ScreenLockerHandlerTest, AbortedLock) {
