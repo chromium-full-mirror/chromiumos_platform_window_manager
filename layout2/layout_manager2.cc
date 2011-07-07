@@ -91,6 +91,7 @@ const double kSecondaryBrowserWindowDimAnimMs = 10000;
 
 // Key binding action names.
 const char kActivateBrowserByIndexActionFormat[] = "activate-browser-%d";
+const char kCloseFocusedNonChromeWindowAction[] = "close-non-chrome-window";
 const char kCycleBackwardAction[] = "cycle-browser-backward";
 const char kCycleForwardAction[] = "cycle-browser-forward";
 const char kLaunchTerminalAction[] = "launch-terminal";
@@ -111,6 +112,7 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
       event_consumer_registrar_(new EventConsumerRegistrar(wm, this)),
       key_bindings_actions_(new KeyBindingsActionRegistrar(wm->key_bindings())),
       key_bindings_group_(new KeyBindingsGroup(wm->key_bindings())),
+      non_chrome_key_bindings_group_(new KeyBindingsGroup(wm->key_bindings())),
       active_browser_index_(-1),
       // Initialized to unwanted value to force SetLayoutMode() update later.
       layout_mode_(WM_IPC_LAYOUT_OVERLAPPING),
@@ -441,10 +443,13 @@ void LayoutManager2::HandleFocusChange() {
 }
 
 void LayoutManager2::HandleModalityChange() {
-  if (wm_->IsModalWindowFocused())
-    key_bindings_group_->Disable();
-  else
-    key_bindings_group_->Enable();
+  key_bindings_group_->SetEnabled(!wm_->IsModalWindowFocused());
+
+  BrowserWindow* active_browser = GetActiveBrowserWindow();
+  non_chrome_key_bindings_group_->SetEnabled(
+      !wm_->IsModalWindowFocused() &&
+      active_browser &&
+      active_browser->win()->type() == chromeos::WM_IPC_WINDOW_UNKNOWN);
 }
 
 bool LayoutManager2::TakeFocus(XTime timestamp) {
@@ -534,7 +539,8 @@ XTime LayoutManager2::GetCurrentXTime() {
 
 void LayoutManager2::InitKeyBindings() {
   // Disable the key bindings until we see the first browser window.
-  key_bindings_group_->Disable();
+  key_bindings_group_->SetEnabled(false);
+  non_chrome_key_bindings_group_->SetEnabled(false);
 
   key_bindings_actions_->AddAction(
       kCycleForwardAction,
@@ -618,6 +624,16 @@ void LayoutManager2::InitKeyBindings() {
       KeyBindings::KeyCombo(
           XK_t, KeyBindings::kControlMask | KeyBindings::kAltMask),
       kLaunchTerminalAction);
+
+  key_bindings_actions_->AddAction(
+      kCloseFocusedNonChromeWindowAction,
+      NewPermanentCallback(
+          this, &LayoutManager2::CloseFocusedNonChromeWindow),
+      NULL, NULL);
+  non_chrome_key_bindings_group_->AddBinding(
+      KeyBindings::KeyCombo(
+          XK_w, KeyBindings::kControlMask | KeyBindings::kShiftMask),
+      kCloseFocusedNonChromeWindowAction);
 }
 
 void LayoutManager2::HandleBrowserWindowMap(Window* win) {
@@ -681,7 +697,7 @@ void LayoutManager2::HandleTransientWindowMap(Window* transient_win,
 void LayoutManager2::HandleFirstBrowserWindowMapped(Window* win) {
   DCHECK(win);
 
-  key_bindings_group_->Enable();
+  key_bindings_group_->SetEnabled(true);
 
   if (!FLAGS_initial_chrome_window_mapped_file.empty()) {
     DLOG(INFO) << "Writing initial Chrome window's ID to file "
@@ -871,8 +887,10 @@ void LayoutManager2::ArrangeBrowserWindows(
     ArrangeFocusPolicy focus_policy,
     XTime timestamp_for_focus,
     int anim_ms) {
-  if (browser_windows_.empty())
+  if (browser_windows_.empty()) {
+    non_chrome_key_bindings_group_->SetEnabled(false);
     return;
+  }
 
   if (!windows_blocking_arrange_.empty())
     return;
@@ -897,12 +915,16 @@ void LayoutManager2::ArrangeBrowserWindows(
     fullscreen_browser_->SetTransientWindowVisibility(true);
     if (focus_policy == ASSIGN_FOCUS_DURING_ARRANGE)
       fullscreen_browser_->TakeFocus(timestamp_for_focus);
+    non_chrome_key_bindings_group_->SetEnabled(false);
   }
 
   BrowserWindow* active_browser = GetActiveBrowserWindow();
   DCHECK(active_browser);
-  if (focus_policy == ASSIGN_FOCUS_DURING_ARRANGE && !fullscreen_browser_)
+  if (focus_policy == ASSIGN_FOCUS_DURING_ARRANGE && !fullscreen_browser_) {
     active_browser->TakeFocus(timestamp_for_focus);
+    non_chrome_key_bindings_group_->SetEnabled(
+        active_browser->win()->type() == chromeos::WM_IPC_WINDOW_UNKNOWN);
+  }
 
   int secondary_browser_index = -1;
   if (!maximized() && num_browser_windows() > 1) {
@@ -917,9 +939,21 @@ void LayoutManager2::ArrangeBrowserWindows(
                           left_offscreen_index,
                           right_offscreen_index);
 
+  // Determine if the active and secondary (if present) windows are actually
+  // Chrome windows.  This can be removed if/when things like cros-term are
+  // gone.
+  const bool active_is_chrome =
+      active_browser->win()->type() ==
+      chromeos::WM_IPC_WINDOW_CHROME_TOPLEVEL;
+  const bool secondary_is_chrome =
+      secondary_browser_index != -1 &&
+      (browser_windows_[secondary_browser_index]->win()->type() ==
+       chromeos::WM_IPC_WINDOW_CHROME_TOPLEVEL);
+
   for (int i = 0; i < num_browser_windows(); ++i) {
     BrowserWindow* browser = browser_windows_[i].get();
     const bool active = (i == active_browser_index_);
+    const bool secondary = (i == secondary_browser_index);
 
     if (browser == fullscreen_browser_)
       continue;
@@ -936,13 +970,18 @@ void LayoutManager2::ArrangeBrowserWindows(
         (left_offscreen_index >= 0 && i <= left_offscreen_index) ||
         (right_offscreen_index >= 0 && i >= right_offscreen_index);
 
-    // Is the window onscreen and extending to the right edge (disregarding any
-    // sliver of a window that we may be showing at the edge of the screen)?
+    // Tell this browser to display a status area if it's fully onscreen and on
+    // the right (or even if it's on the left, if the window on the right isn't
+    // Chrome).
     const bool on_right =
         (maximized() && active) ||
         (active && !browser->anchored_to_left()) ||
-        (!active && !offscreen && active_browser->anchored_to_left());
-    browser->SetStatusAreaDisplayed(on_right);
+        (secondary && active_browser->anchored_to_left());
+    const bool display_status =
+        on_right ||
+        (active && !secondary_is_chrome) ||
+        (secondary && !active_is_chrome);
+    browser->SetStatusAreaDisplayed(display_status);
 
     browser->SetMaximizedProperty(maximized());
     browser->SetBounds(bounds[i], anim_ms);
@@ -1381,6 +1420,15 @@ void LayoutManager2::HandleActiveWindowRequest(Window* win, XTime timestamp) {
     ArrangeBrowserWindows(ARRANGE_ALL_BROWSERS, ASSIGN_FOCUS_DURING_ARRANGE,
                           timestamp, kWindowAnimMs);
   }
+}
+
+void LayoutManager2::CloseFocusedNonChromeWindow() {
+  BrowserWindow* active_browser = GetActiveBrowserWindow();
+  if (!active_browser)
+    return;
+  if (active_browser->win()->type() != chromeos::WM_IPC_WINDOW_UNKNOWN)
+    return;
+  active_browser->win()->SendDeleteRequest(GetCurrentXTime());
 }
 
 }  // namespace window_manager

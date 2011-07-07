@@ -199,7 +199,8 @@ double BrowserWindow::GetInstantaneousBrightness() const {
 }
 
 void BrowserWindow::SetStatusAreaDisplayed(bool displayed) {
-  if (status_area_displayed_ == displayed)
+  if (status_area_displayed_ == displayed ||
+      win_->type() != chromeos::WM_IPC_WINDOW_CHROME_TOPLEVEL)
     return;
 
   status_area_displayed_ = displayed;

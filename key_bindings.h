@@ -179,8 +179,7 @@ class KeyBindingsGroup {
                   const std::string& action_name);
 
   // Enable or disable all bindings in this group.
-  void Enable();
-  void Disable();
+  void SetEnabled(bool enabled);
 
  private:
   KeyBindings* bindings_;  // not owned

@@ -573,7 +573,7 @@ TEST_F(KeyBindingsTest, KeyBindingsGroup) {
   group->AddBinding(KeyBindings::KeyCombo(keysym_a, mods), actions_[0]->name);
   EXPECT_TRUE(xconn_->KeyIsGrabbed(1, mods));
 
-  group->Disable();
+  group->SetEnabled(false);
   EXPECT_FALSE(group->enabled());
   EXPECT_FALSE(xconn_->KeyIsGrabbed(1, mods));
 
@@ -581,7 +581,7 @@ TEST_F(KeyBindingsTest, KeyBindingsGroup) {
   EXPECT_FALSE(xconn_->KeyIsGrabbed(1, mods));
   EXPECT_FALSE(xconn_->KeyIsGrabbed(2, mods));
 
-  group->Enable();
+  group->SetEnabled(true);
   EXPECT_TRUE(xconn_->KeyIsGrabbed(1, mods));
   EXPECT_TRUE(xconn_->KeyIsGrabbed(2, mods));
 

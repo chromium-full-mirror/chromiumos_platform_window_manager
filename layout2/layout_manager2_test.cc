@@ -1107,6 +1107,117 @@ TEST_F(LayoutManager2Test, DontFocusForClickInStatusArea) {
   EXPECT_EQ(xid2, xconn_->focused_xid());
 }
 
+// Check that we ask Chrome windows on the left side of the screen to hide their
+// status areas.
+TEST_F(LayoutManager2Test, HideStatusArea) {
+  const XAtom kChromeStateAtom = xconn_->GetAtomOrDie("_CHROME_STATE");
+  const XAtom kChromeStateStatusHiddenAtom =
+      xconn_->GetAtomOrDie("_CHROME_STATE_STATUS_HIDDEN");
+
+  // Map two Chrome browser windows.
+  XWindow chrome_xid1 = CreateSimpleWindow();
+  ASSERT_TRUE(wm_->wm_ipc()->SetWindowType(
+      chrome_xid1, chromeos::WM_IPC_WINDOW_CHROME_TOPLEVEL, NULL));
+  SendInitialEventsForWindow(chrome_xid1);
+
+  XWindow chrome_xid2 = CreateSimpleWindow();
+  ASSERT_TRUE(wm_->wm_ipc()->SetWindowType(
+      chrome_xid2, chromeos::WM_IPC_WINDOW_CHROME_TOPLEVEL, NULL));
+  SendInitialEventsForWindow(chrome_xid2);
+  ASSERT_EQ(chrome_xid2, xconn_->focused_xid());
+
+  // We should be hiding the first (leftmost) Chrome window's status area but
+  // not the second's.
+  EXPECT_TRUE(IntArrayPropertyContains(
+      chrome_xid1, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_FALSE(IntArrayPropertyContains(
+      chrome_xid2, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+
+  // Now map a non-Chrome window.
+  XWindow non_chrome_xid = CreateSimpleWindow();
+  SendInitialEventsForWindow(non_chrome_xid);
+  ASSERT_EQ(non_chrome_xid, xconn_->focused_xid());
+
+  // We should continue showing the second Chrome window's status area, since
+  // the focused non-Chrome window presumably doesn't have a status area.
+  EXPECT_TRUE(IntArrayPropertyContains(
+      chrome_xid1, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_FALSE(IntArrayPropertyContains(
+      chrome_xid2, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_FALSE(IntArrayPropertyContains(
+      non_chrome_xid, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+
+  // Create a third Chrome window.
+  XWindow chrome_xid3 = CreateSimpleWindow();
+  ASSERT_TRUE(wm_->wm_ipc()->SetWindowType(
+      chrome_xid3, chromeos::WM_IPC_WINDOW_CHROME_TOPLEVEL, NULL));
+  SendInitialEventsForWindow(chrome_xid3);
+  ASSERT_EQ(chrome_xid3, xconn_->focused_xid());
+
+  // Now we should be hiding the first two Chrome window's status areas.
+  // There's no reason to ask the non-Chrome window to hide it.
+  EXPECT_TRUE(IntArrayPropertyContains(
+      chrome_xid1, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_TRUE(IntArrayPropertyContains(
+      chrome_xid2, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_FALSE(IntArrayPropertyContains(
+      non_chrome_xid, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_FALSE(IntArrayPropertyContains(
+      chrome_xid3, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+
+  // If we switch to the first Chrome window, we should show the second Chrome
+  // window's status area.
+  SendActiveWindowMessage(chrome_xid1);
+  ASSERT_EQ(chrome_xid1, xconn_->focused_xid());
+  EXPECT_TRUE(IntArrayPropertyContains(
+      chrome_xid1, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_FALSE(IntArrayPropertyContains(
+      chrome_xid2, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_FALSE(IntArrayPropertyContains(
+      non_chrome_xid, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+  EXPECT_TRUE(IntArrayPropertyContains(
+      chrome_xid3, kChromeStateAtom, kChromeStateStatusHiddenAtom));
+}
+
+TEST_F(LayoutManager2Test, CloseNonChromeWindows) {
+  const XAtom kWmProtocolsAtom = xconn_->GetAtomOrDie("WM_PROTOCOLS");
+  const XAtom kWmDeleteWindowAtom = xconn_->GetAtomOrDie("WM_DELETE_WINDOW");
+
+  // Map a Chrome window.
+  XWindow chrome_xid = CreateSimpleWindow();
+  ASSERT_TRUE(wm_->wm_ipc()->SetWindowType(
+      chrome_xid, chromeos::WM_IPC_WINDOW_CHROME_TOPLEVEL, NULL));
+  AppendAtomToProperty(chrome_xid, kWmProtocolsAtom, kWmDeleteWindowAtom);
+  SendInitialEventsForWindow(chrome_xid);
+
+  // Ctrl-Shift-W shouldn't do anything.
+  const KeyBindings::KeyCombo kCtrlShiftWKeyCombo(
+      XK_w, KeyBindings::kControlMask | KeyBindings::kShiftMask);
+  const XTime kEventTime = wm_->GetCurrentTimeFromServer();
+  SendKey(xconn_->GetRootWindow(), kCtrlShiftWKeyCombo, kEventTime, kEventTime);
+  EXPECT_EQ(0, GetNumDeleteWindowMessagesForWindow(chrome_xid));
+
+  // Now map a non-Chrome window.
+  XWindow non_chrome_xid = CreateSimpleWindow();
+  AppendAtomToProperty(non_chrome_xid, kWmProtocolsAtom, kWmDeleteWindowAtom);
+  SendInitialEventsForWindow(non_chrome_xid);
+  ASSERT_EQ(non_chrome_xid, xconn_->focused_xid());
+
+  // We should send it a delete request on Ctrl-Shift-W.
+  ASSERT_EQ(0, GetNumDeleteWindowMessagesForWindow(non_chrome_xid));
+  SendKey(xconn_->GetRootWindow(), kCtrlShiftWKeyCombo, kEventTime, kEventTime);
+  EXPECT_EQ(1, GetNumDeleteWindowMessagesForWindow(non_chrome_xid));
+
+  // After unmapping the non-Chrome window, the Ctrl-Shift-W binding should be
+  // disabled again.
+  XEvent event;
+  xconn_->InitUnmapEvent(&event, non_chrome_xid);
+  wm_->HandleEvent(&event);
+  ASSERT_EQ(chrome_xid, xconn_->focused_xid());
+  SendKey(xconn_->GetRootWindow(), kCtrlShiftWKeyCombo, kEventTime, kEventTime);
+  EXPECT_EQ(0, GetNumDeleteWindowMessagesForWindow(chrome_xid));
+}
+
 }  // namespace window_manager
 
 int main(int argc, char** argv) {

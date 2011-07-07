@@ -281,12 +281,20 @@ class LayoutManager2 : public EventConsumer,
   void HandleModalityRequest(Window* win, bool modal);
   void HandleActiveWindowRequest(Window* win, XTime timestamp);
 
+  // Close the currently-focused "browser" window if it doesn't appear to be a
+  // Chrome window.  (This provides a way to close cros-term windows.)
+  void CloseFocusedNonChromeWindow();
+
   WindowManager* wm_;  // not owned
 
   scoped_ptr<EventConsumerRegistrar> event_consumer_registrar_;
   scoped_ptr<KeyBindingsActionRegistrar> key_bindings_actions_;
 
+  // Key bindings that are always enabled (while a modal dialog isn't open).
   scoped_ptr<KeyBindingsGroup> key_bindings_group_;
+
+  // Key bindings that are only enabled when a non-Chrome window is focused.
+  scoped_ptr<KeyBindingsGroup> non_chrome_key_bindings_group_;
 
   std::vector<std::tr1::shared_ptr<BrowserWindow> > browser_windows_;
 

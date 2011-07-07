@@ -366,7 +366,7 @@ KeyBindingsGroup::KeyBindingsGroup(KeyBindings* bindings)
 }
 
 KeyBindingsGroup::~KeyBindingsGroup() {
-  Disable();
+  SetEnabled(false);
 }
 
 void KeyBindingsGroup::AddBinding(const KeyBindings::KeyCombo& combo,
@@ -376,28 +376,20 @@ void KeyBindingsGroup::AddBinding(const KeyBindings::KeyCombo& combo,
     bindings_->AddBinding(combo, action_name);
 }
 
-void KeyBindingsGroup::Enable() {
-  if (enabled_)
+void KeyBindingsGroup::SetEnabled(bool enabled) {
+  if (enabled_ == enabled)
     return;
+
+  enabled_ = enabled;
 
   for (map<KeyBindings::KeyCombo, string>::const_iterator it =
          combos_to_action_names_.begin();
        it != combos_to_action_names_.end(); ++it) {
-    bindings_->AddBinding(it->first, it->second);
+    if (enabled)
+      bindings_->AddBinding(it->first, it->second);
+    else
+      bindings_->RemoveBinding(it->first);
   }
-  enabled_ = true;
-}
-
-void KeyBindingsGroup::Disable() {
-  if (!enabled_)
-    return;
-
-  for (map<KeyBindings::KeyCombo, string>::const_iterator it =
-         combos_to_action_names_.begin();
-       it != combos_to_action_names_.end(); ++it) {
-    bindings_->RemoveBinding(it->first);
-  }
-  enabled_ = false;
 }
 
 }  // namespace window_manager
