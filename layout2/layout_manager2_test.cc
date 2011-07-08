@@ -1218,6 +1218,25 @@ TEST_F(LayoutManager2Test, CloseNonChromeWindows) {
   EXPECT_EQ(0, GetNumDeleteWindowMessagesForWindow(chrome_xid));
 }
 
+// Check that we don't crash if we unmap a transient window after the window
+// that owns it (http://crosbug.com/17377).
+TEST_F(LayoutManager2Test, UnmapTransientAfterOwner) {
+  XWindow xid = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid);
+
+  XWindow transient_xid = CreateSimpleWindow();
+  MockXConnection::WindowInfo* transient_info =
+      xconn_->GetWindowInfoOrDie(transient_xid);
+  transient_info->transient_for = xid;
+  SendInitialEventsForWindow(transient_xid);
+
+  XEvent event;
+  xconn_->InitUnmapEvent(&event, xid);
+  wm_->HandleEvent(&event);
+  xconn_->InitUnmapEvent(&event, transient_xid);
+  wm_->HandleEvent(&event);
+}
+
 }  // namespace window_manager
 
 int main(int argc, char** argv) {

@@ -258,12 +258,29 @@ void LayoutManager2::HandleWindowUnmap(Window* win) {
   if (browser_index < 0)
     return;
 
+  BrowserWindow* browser = browser_windows_[browser_index].get();
+
   const bool had_focus = (win == wm_->focus_manager()->focused_win());
   HandleWindowNoLongerBlockingArrange(win);
   if (fullscreen_browser_ && fullscreen_browser_->win() == win)
     SetFullscreenBrowserWindow(NULL);
 
+  // Delete any dangling references in the transient-to-browser map caused by
+  // the browser getting unmapped before its transients.
+  vector<XWindow> orphaned_transient_xids;
+  for (map<XWindow, BrowserWindow*>::const_iterator it =
+       transient_xids_to_browsers_.begin();
+       it != transient_xids_to_browsers_.end(); ++it) {
+    if (it->second == browser)
+      orphaned_transient_xids.push_back(it->first);
+  }
+  for (vector<XWindow>::const_iterator it = orphaned_transient_xids.begin();
+       it != orphaned_transient_xids.end(); ++it) {
+    CHECK(transient_xids_to_browsers_.erase(*it) == 1);
+  }
+
   browser_windows_.erase(browser_windows_.begin() + browser_index);
+  browser = NULL;
 
   if (num_browser_windows() <= 1)
     SetLayoutMode(WM_IPC_LAYOUT_MAXIMIZED, false);
