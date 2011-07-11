@@ -525,8 +525,7 @@ TEST_F(WindowManagerTest, StackOverrideRedirectWindowsAboveLayers) {
 TEST_F(WindowManagerTest, ConfigureRequestBeforeMap) {
   XWindow xid = CreateSimpleWindow();
   MockXConnection::WindowInfo* info = xconn_->GetWindowInfoOrDie(xid);
-  const int orig_width = info->bounds.width;
-  const int orig_height = info->bounds.height;
+  const Size kOrigSize = info->bounds.size();
 
   XEvent event;
   xconn_->InitCreateWindowEvent(&event, xid);
@@ -534,37 +533,55 @@ TEST_F(WindowManagerTest, ConfigureRequestBeforeMap) {
 
   // Send a ConfigureRequest event with its width and height fields masked
   // out, and check that the new width and height values are ignored.
-  const int new_width = orig_width * 2;
-  const int new_height = orig_height * 2;
+  const Size kNewSize(kOrigSize.width * 2, kOrigSize.height * 2);
   xconn_->InitConfigureRequestEvent(
-      &event, xid, Rect(info->bounds.x, info->bounds.y, new_width, new_height));
+      &event, xid, Rect(info->bounds.position(), kNewSize));
   event.xconfigurerequest.value_mask &= ~(CWWidth | CWHeight);
   wm_->HandleEvent(&event);
-  EXPECT_EQ(orig_width, info->bounds.width);
-  EXPECT_EQ(orig_height, info->bounds.height);
+  EXPECT_EQ(kOrigSize, info->bounds.size());
 
   // Now turn on the width bit and check that it gets applied.
   event.xconfigurerequest.value_mask |= CWWidth;
   wm_->HandleEvent(&event);
-  EXPECT_EQ(new_width, info->bounds.width);
-  EXPECT_EQ(orig_height, info->bounds.height);
+  EXPECT_EQ(Size(kNewSize.width, kOrigSize.height), info->bounds.size());
 
   // Turn on the height bit as well.
   event.xconfigurerequest.value_mask |= CWHeight;
   wm_->HandleEvent(&event);
-  EXPECT_EQ(new_width, info->bounds.width);
-  EXPECT_EQ(new_height, info->bounds.height);
+  EXPECT_EQ(kNewSize, info->bounds.size());
 
   // Send a request to move the window and check that both the X and composited
   // positions are updated.  See http://crosbug.com/14075.
   const Point kNewPosition(info->bounds.x + 10, info->bounds.y + 20);
   xconn_->InitConfigureRequestEvent(
-      &event, xid, Rect(kNewPosition.x, kNewPosition.y, 0, 0));
+      &event, xid, Rect(kNewPosition, Size(0, 0)));
   event.xconfigurerequest.value_mask = (CWX | CWY);
   wm_->HandleEvent(&event);
   EXPECT_EQ(kNewPosition, info->bounds.position());
   EXPECT_EQ(kNewPosition,
             wm_->GetWindowOrDie(xid)->actor()->GetBounds().position());
+
+  // Now map and unmap the window.
+  xconn_->InitMapRequestEvent(&event, xid);
+  wm_->HandleEvent(&event);
+  ASSERT_TRUE(info->mapped);
+  xconn_->InitMapEvent(&event, xid);
+  wm_->HandleEvent(&event);
+  ASSERT_TRUE(xconn_->UnmapWindow(xid));
+  xconn_->InitUnmapEvent(&event, xid);
+  wm_->HandleEvent(&event);
+
+  // Try to configure the window again.  This is testing against a regression of
+  // the failed assert from http://crosbug.com/17376.
+  const Rect kNewBounds(
+      Point(kNewPosition.x + 30, kNewPosition.y + 40), kNewSize);
+  xconn_->InitConfigureRequestEvent(&event, xid, kNewBounds);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(kNewBounds.position(),
+            wm_->GetWindowOrDie(xid)->composited_origin());
+  // There's no guarantee that the X window will be moved -- if the window's
+  // visibility was set to VISIBILITY_HIDDEN when it was unmapped, only the
+  // actor will be moved.
 }
 
 TEST_F(WindowManagerTest, ResizeScreen) {

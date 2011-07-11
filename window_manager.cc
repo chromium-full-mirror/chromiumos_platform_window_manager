@@ -1593,12 +1593,20 @@ void WindowManager::HandleConfigureRequest(const XConfigureRequestEvent& e) {
   if (!win->mapped()) {
     // If the window is unmapped, it's unlikely that any event consumers
     // will know what to do with it.  Do whatever we were asked to do.
-    if (requested_bounds.position() != win->client_origin()) {
-      win->MoveClient(requested_bounds.x, requested_bounds.y);
-      win->MoveComposited(requested_bounds.x, requested_bounds.y, 0);
+    if (win->client_bounds() != requested_bounds) {
+      if (win->visibility() != Window::VISIBILITY_UNSET) {
+        // Previously-mapped windows may have their visibility set -- see
+        // http://crosbug.com/17376.
+        win->SetBounds(requested_bounds, 0);
+      } else {
+        if (requested_bounds.position() != win->client_origin()) {
+          win->MoveClient(requested_bounds.x, requested_bounds.y);
+          win->MoveComposited(requested_bounds.x, requested_bounds.y, 0);
+        }
+        if (requested_bounds.size() != win->client_size())
+          win->Resize(requested_bounds.size(), GRAVITY_NORTHWEST);
+      }
     }
-    if (requested_bounds.size() != win->client_size())
-      win->Resize(requested_bounds.size(), GRAVITY_NORTHWEST);
   } else {
     FOR_EACH_INTERESTED_EVENT_CONSUMER(
         window_event_consumers_,
