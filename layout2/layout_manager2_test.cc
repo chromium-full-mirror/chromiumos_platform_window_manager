@@ -5,6 +5,7 @@
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,7 @@
 #include "window_manager/layout2/browser_window.h"
 #include "window_manager/layout2/layout_manager2.h"
 #include "window_manager/panels/panel.h"
+#include "window_manager/panels/panel_manager.h"
 #include "window_manager/shadow.h"
 #include "window_manager/stacking_manager.h"
 #include "window_manager/test_lib.h"
@@ -28,6 +30,7 @@ DEFINE_bool(logtostderr, false,
 DECLARE_string(initial_chrome_window_mapped_file);
 DECLARE_bool(multiple_windows);
 
+using std::set;
 using std::string;
 using std::vector;
 
@@ -49,6 +52,45 @@ class LayoutManager2Test : public BasicWindowManagerTest {
     // No slice is visible (i.e. the active or secondary browser window on that
     // side of the screen is flush with the edge).
     EDGE_HAS_NO_BROWSER,
+  };
+
+  // Mock implementation used to test that LayoutManager2 takes panel docks into
+  // account when determining how much of the screen to use.
+  class MockPanelManager : public PanelManagerAreaChangeNotifier {
+   public:
+    MockPanelManager() : left_width_(0), right_width_(0) {}
+    virtual ~MockPanelManager() {}
+
+    // PanelManagerAreaChangeNotifier implementation.
+    virtual void RegisterAreaChangeListener(
+        PanelManagerAreaChangeListener* listener) {
+      ASSERT_TRUE(listeners_.insert(listener).second);
+    }
+    virtual void UnregisterAreaChangeListener(
+        PanelManagerAreaChangeListener* listener) {
+      ASSERT_EQ(static_cast<size_t>(1), listeners_.erase(listener));
+    }
+    virtual void GetArea(int* left_width, int* right_width) const {
+      *left_width = left_width_;
+      *right_width = right_width_;
+    }
+
+    void set_left_width(int width) { left_width_ = width; }
+    void set_right_width(int width) { right_width_ = width; }
+
+    void NotifyListeners() {
+      for (set<PanelManagerAreaChangeListener*>::const_iterator it =
+           listeners_.begin(); it != listeners_.end(); ++it) {
+        (*it)->HandlePanelManagerAreaChange();
+      }
+    }
+
+   private:
+    int left_width_;
+    int right_width_;
+    set<PanelManagerAreaChangeListener*> listeners_;
+
+    DISALLOW_COPY_AND_ASSIGN(MockPanelManager);
   };
 
   LayoutManager2* layout_manager() { return wm_->layout_manager_.get(); }
@@ -514,13 +556,10 @@ TEST_F(LayoutManager2Test, LegacyFullscreen) {
   wm_->HandleEvent(&event);
 }
 
-TEST_F(LayoutManager2Test, LegacyResizeScreen) {
-  AutoReset<bool> multiple_windows_flag_resetter(
-      &FLAGS_multiple_windows, false);
-  CreateAndInitNewWm();
-
+TEST_F(LayoutManager2Test, ResizeScreen) {
   const Rect kInitialRootBounds = xconn_->root_bounds();
   XWindow xid = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info = xconn_->GetWindowInfoOrDie(xid);
   SendInitialEventsForWindow(xid);
   EXPECT_EQ(kInitialRootBounds, xconn_->GetWindowInfoOrDie(xid)->bounds);
   EXPECT_EQ(kInitialRootBounds, GetCompositedWindowBounds(xid));
@@ -532,10 +571,44 @@ TEST_F(LayoutManager2Test, LegacyResizeScreen) {
   XEvent event;
   xconn_->InitConfigureNotifyEvent(&event, xconn_->GetRootWindow());
   wm_->HandleEvent(&event);
-  EXPECT_EQ(kNewRootBounds, xconn_->GetWindowInfoOrDie(xid)->bounds);
-  xconn_->InitConfigureNotifyEvent(&event, xid);
-  wm_->HandleEvent(&event);
+  EXPECT_EQ(kNewRootBounds, info->bounds);
+  SendConfigureNotifyEvent(xid);
   EXPECT_EQ(kNewRootBounds, GetCompositedWindowBounds(xid));
+
+  // Register a mock panel manager and check that the window is reconfigured
+  // appropriately.
+  MockPanelManager panel_manager;
+  layout_manager()->SetPanelAreaNotifier(&panel_manager);
+  const int kLeftPanelWidth = 20;
+  const int kRightPanelWidth = 40;
+  panel_manager.set_left_width(kLeftPanelWidth);
+  panel_manager.set_right_width(kRightPanelWidth);
+  panel_manager.NotifyListeners();
+  const Rect kAvailableBounds(
+      kLeftPanelWidth, 0,
+      kNewRootBounds.width - (kLeftPanelWidth + kRightPanelWidth),
+      kNewRootBounds.height);
+  EXPECT_EQ(kAvailableBounds, info->bounds);
+  SendConfigureNotifyEvent(xid);
+  EXPECT_EQ(kAvailableBounds, GetCompositedWindowBounds(xid));
+
+  // Create a second browser and check that both are constrained within the
+  // available area.
+  XWindow xid2 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info2 = xconn_->GetWindowInfoOrDie(xid2);
+  SendInitialEventsForWindow(xid2);
+  EXPECT_EQ(
+      GetExpectedBoundsForBrowser(
+          kAvailableBounds, SIDE_LEFT, EDGE_HAS_NO_BROWSER,
+          layout_manager()->FindBrowserWindowByXid(xid)->unmaximized_width()),
+      info->bounds);
+  EXPECT_EQ(
+      GetExpectedBoundsForBrowser(
+          kAvailableBounds, SIDE_RIGHT, EDGE_HAS_NO_BROWSER,
+          layout_manager()->FindBrowserWindowByXid(xid2)->unmaximized_width()),
+      info2->bounds);
+
+  layout_manager()->SetPanelAreaNotifier(NULL);
 }
 
 TEST_F(LayoutManager2Test, LegacyStackShadowsAtBottomOfLayer) {

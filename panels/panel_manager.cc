@@ -508,27 +508,6 @@ void PanelManager::HandleFocusChange() {
     RestoreFullscreenPanel(fullscreen_panel_);
 }
 
-void PanelManager::HandlePanelResizeByUser(Panel* panel) {
-  DCHECK(panel);
-  if (PanelContainer* container = GetContainerForPanel(*panel))
-    container->HandlePanelResizeByUser(panel);
-}
-
-void PanelManager::HandleDockVisibilityChange(PanelDock* dock) {
-  for (set<PanelManagerAreaChangeListener*>::const_iterator it =
-           area_change_listeners_.begin();
-       it != area_change_listeners_.end(); ++it) {
-    (*it)->HandlePanelManagerAreaChange();
-  }
-
-}
-
-bool PanelManager::TakeFocus(XTime timestamp) {
-  return panel_bar_->TakeFocus(timestamp) ||
-         left_panel_dock_->TakeFocus(timestamp) ||
-         right_panel_dock_->TakeFocus(timestamp);
-}
-
 void PanelManager::RegisterAreaChangeListener(
     PanelManagerAreaChangeListener* listener) {
   DCHECK(listener);
@@ -549,6 +528,26 @@ void PanelManager::GetArea(int* left_width, int* right_width) const {
       left_panel_dock_->is_visible() ? left_panel_dock_->width() : 0;
   *right_width =
       right_panel_dock_->is_visible() ? right_panel_dock_->width() : 0;
+}
+
+void PanelManager::HandlePanelResizeByUser(Panel* panel) {
+  DCHECK(panel);
+  if (PanelContainer* container = GetContainerForPanel(*panel))
+    container->HandlePanelResizeByUser(panel);
+}
+
+void PanelManager::HandleDockVisibilityChange(PanelDock* dock) {
+  for (set<PanelManagerAreaChangeListener*>::const_iterator it =
+           area_change_listeners_.begin();
+       it != area_change_listeners_.end(); ++it) {
+    (*it)->HandlePanelManagerAreaChange();
+  }
+}
+
+bool PanelManager::TakeFocus(XTime timestamp) {
+  return panel_bar_->TakeFocus(timestamp) ||
+         left_panel_dock_->TakeFocus(timestamp) ||
+         right_panel_dock_->TakeFocus(timestamp);
 }
 
 Panel* PanelManager::GetPanelByXid(XWindow xid) {

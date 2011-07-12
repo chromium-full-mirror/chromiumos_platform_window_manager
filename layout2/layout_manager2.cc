@@ -109,6 +109,8 @@ const double LayoutManager2::kSecondaryBrowserWindowBrightness = 0.9;
 
 LayoutManager2::LayoutManager2(WindowManager* wm)
     : wm_(wm),
+      panel_area_notifier_(NULL),
+      workarea_(wm_->root_bounds()),
       event_consumer_registrar_(new EventConsumerRegistrar(wm, this)),
       key_bindings_actions_(new KeyBindingsActionRegistrar(wm->key_bindings())),
       key_bindings_group_(new KeyBindingsGroup(wm->key_bindings())),
@@ -127,7 +129,6 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
           wm_->CreateInputWindow(Rect(-1, -1, 1, 1), ButtonPressMask)),
       in_resize_drag_(false),
       resize_width_at_start_(0),
-      last_screen_size_(wm_->root_size()),
       first_browser_window_mapped_(false) {
   event_consumer_registrar_->RegisterForChromeMessages(
       chromeos::WM_IPC_MESSAGE_WM_CYCLE_WINDOWS);
@@ -165,6 +166,7 @@ LayoutManager2::~LayoutManager2() {
   browser_windows_.clear();
   wm_->focus_manager()->UnregisterFocusChangeListener(this);
   wm_->modality_handler()->UnregisterModalityChangeListener(this);
+  SetPanelAreaNotifier(NULL);
   wm_->xconn()->DestroyWindow(resize_handle_xid_);
   wm_->xconn()->FreeCursor(left_cursor_);
   wm_->xconn()->FreeCursor(right_cursor_);
@@ -173,21 +175,7 @@ LayoutManager2::~LayoutManager2() {
 }
 
 void LayoutManager2::HandleScreenResize() {
-  // Try to preserve windows' old fractions of the screen's width while ensuring
-  // that they stay within the acceptable limits.
-  Size new_size = wm_->root_size();
-  for (int i = 0; i < num_browser_windows(); ++i) {
-    BrowserWindow* browser = browser_windows_[i].get();
-    const double ratio =
-        static_cast<double>(browser->unmaximized_width()) /
-        last_screen_size_.width;
-    browser->set_unmaximized_width(
-        ConstrainUnmaximizedWidth(round(ratio * new_size.width)));
-  }
-  // TODO(derat): Recenter transient windows?
-  ArrangeBrowserWindows(
-      ARRANGE_ALL_BROWSERS, PRESERVE_FOCUS_DURING_ARRANGE, 0, 0);
-  last_screen_size_ = new_size;
+  MoveAndResizeForAvailableArea();
 }
 
 bool LayoutManager2::HandleWindowMapRequest(Window* win) {
@@ -206,15 +194,16 @@ bool LayoutManager2::HandleWindowMapRequest(Window* win) {
 
   if (BrowserWindow::ShouldHandleWindow(*win)) {
     win->SetVisibility(Window::VISIBILITY_HIDDEN);
-    win->Move(Point(wm_->width(), 0), 0);
+    win->Move(Point(workarea_.right(), workarea_.top()), 0);
 
     const bool maximize =
         !FLAGS_multiple_windows || (maximized() && num_browser_windows() != 1);
-    const int width =
-        maximize || win->wm_state_fullscreen() ?
-        wm_->width() :
-        GetInitialUnmaximizedWidth();
-    win->Resize(Size(width, wm_->height()), GRAVITY_NORTHWEST);
+    Size initial_size = workarea_.size();
+    if (win->wm_state_fullscreen())
+      initial_size = wm_->root_bounds().size();
+    else if (!maximize)
+      initial_size.width = GetInitialUnmaximizedWidth();
+    win->Resize(initial_size, GRAVITY_NORTHWEST);
     return true;
   }
 
@@ -469,6 +458,10 @@ void LayoutManager2::HandleModalityChange() {
       active_browser->win()->type() == chromeos::WM_IPC_WINDOW_UNKNOWN);
 }
 
+void LayoutManager2::HandlePanelManagerAreaChange() {
+  MoveAndResizeForAvailableArea();
+}
+
 bool LayoutManager2::TakeFocus(XTime timestamp) {
   if (browser_windows_.empty())
     return false;
@@ -478,6 +471,17 @@ bool LayoutManager2::TakeFocus(XTime timestamp) {
   else
     GetActiveBrowserWindow()->TakeFocus(timestamp);
   return true;
+}
+
+void LayoutManager2::SetPanelAreaNotifier(
+    PanelManagerAreaChangeNotifier* notifier) {
+  if (panel_area_notifier_)
+    panel_area_notifier_->UnregisterAreaChangeListener(this);
+
+  panel_area_notifier_ = notifier;
+  if (panel_area_notifier_)
+    panel_area_notifier_->RegisterAreaChangeListener(this);
+  MoveAndResizeForAvailableArea();
 }
 
 BrowserWindow* LayoutManager2::GetActiveBrowserWindow() const {
@@ -526,11 +530,11 @@ int LayoutManager2::GetInitialUnmaximizedWidth() const {
 int LayoutManager2::GetMinUnmaximizedWidth() const {
   // TODO(derat): Change this based on whether there's a window to the edge or
   // not?
-  return 0.5 * (wm_->width() + 1);
+  return 0.5 * (workarea_.width + 1);
 }
 
 int LayoutManager2::GetMaxUnmaximizedWidth() const {
-  return wm_->width() - kStatusWidthPixels - 2 * kEdgeGapPixels;
+  return workarea_.width - kStatusWidthPixels - 2 * kEdgeGapPixels;
 }
 
 int LayoutManager2::ConstrainUnmaximizedWidth(int requested_width) {
@@ -552,6 +556,32 @@ XTime LayoutManager2::GetCurrentXTime() {
   if (!current_xtime)
     current_xtime = wm_->GetCurrentTimeFromServer();
   return current_xtime;
+}
+
+void LayoutManager2::MoveAndResizeForAvailableArea() {
+  const Size old_size = workarea_.size();
+
+  int panel_manager_left_width = 0, panel_manager_right_width = 0;
+  if (panel_area_notifier_)
+    panel_area_notifier_->GetArea(&panel_manager_left_width,
+                                  &panel_manager_right_width);
+
+  workarea_ = wm_->root_bounds();
+  workarea_.x += panel_manager_left_width;
+  workarea_.width -= (panel_manager_left_width + panel_manager_right_width);
+
+  // Try to preserve windows' old fractions of the screen's width while ensuring
+  // that they stay within the acceptable limits.
+  for (int i = 0; i < num_browser_windows(); ++i) {
+    BrowserWindow* browser = browser_windows_[i].get();
+    const double ratio =
+        static_cast<double>(browser->unmaximized_width()) / old_size.width;
+    browser->set_unmaximized_width(
+        ConstrainUnmaximizedWidth(round(ratio * workarea_.width)));
+  }
+  // TODO(derat): Recenter transient windows?
+  ArrangeBrowserWindows(
+      ARRANGE_ALL_BROWSERS, PRESERVE_FOCUS_DURING_ARRANGE, 0, 0);
 }
 
 void LayoutManager2::InitKeyBindings() {
@@ -750,15 +780,17 @@ void LayoutManager2::ComputeBrowserWindowBounds(vector<Rect>* bounds,
   switch (layout_mode_) {
     case WM_IPC_LAYOUT_MAXIMIZED: {
       // The maximized case is simple: align the active browser window with the
-      // left edge of the screen and move one screen width away from it for each
-      // other window.
-      (*bounds)[active_browser_index_].reset(0, 0, wm_->width(), wm_->height());
+      // left edge of our bounds and move one workarea-width away from it for
+      // each other window.
+      (*bounds)[active_browser_index_] = workarea_;
       for (int i = active_browser_index_ - 1; i >= 0; --i)
         (*bounds)[i].reset(
-            (*bounds)[i + 1].x - wm_->width(), 0, wm_->width(), wm_->height());
+            (*bounds)[i + 1].x - workarea_.width, workarea_.y,
+            workarea_.width, workarea_.height);
       for (int i = active_browser_index_ + 1; i < num_browser_windows(); ++i)
         (*bounds)[i].reset(
-            (*bounds)[i - 1].x + wm_->width(), 0, wm_->width(), wm_->height());
+            (*bounds)[i - 1].x + workarea_.width, workarea_.y,
+            workarea_.width, workarea_.height);
       break;
     }
     case WM_IPC_LAYOUT_OVERLAPPING: {
@@ -782,15 +814,17 @@ void LayoutManager2::ComputeBrowserWindowBounds(vector<Rect>* bounds,
       // Assign positions to the left and right windows, leaving small gaps on
       // the sides if there are more windows in either direction.
       (*bounds)[left_index].reset(
-          left_index >= 1 ? kEdgeGapPixels : 0, 0,
-          left_browser->unmaximized_width(), wm_->height());
+          workarea_.x + (left_index >= 1 ? kEdgeGapPixels : 0), workarea_.y,
+          left_browser->unmaximized_width(), workarea_.height);
       (*bounds)[right_index].reset(
-          wm_->width() -
-          right_browser->unmaximized_width() -
-          (right_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
-          right_browser->unmaximized_width(), wm_->height());
+          workarea_.right() -
+            right_browser->unmaximized_width() -
+            (right_index < num_browser_windows() - 1 ? kEdgeGapPixels : 0),
+          workarea_.y,
+          right_browser->unmaximized_width(),
+          workarea_.height);
 
-      // Next, walk to the left, putting each window one screen width from the
+      // Next, walk to the left, putting each window one bounds-width from the
       // right edge of the window to its right (plus any gap that we're
       // reserving for the next window beyond that one).
       int prev_right_edge =
@@ -799,8 +833,10 @@ void LayoutManager2::ComputeBrowserWindowBounds(vector<Rect>* bounds,
       for (int i = left_index - 1; i >= 0; --i) {
         BrowserWindow* browser = browser_windows_[i].get();
         (*bounds)[i].reset(
-            prev_right_edge - wm_->width() + (i >= 1 ? kEdgeGapPixels : 0), 0,
-            browser->unmaximized_width(), wm_->height());
+            prev_right_edge - workarea_.width + (i >= 1 ? kEdgeGapPixels : 0),
+            workarea_.y,
+            browser->unmaximized_width(),
+            workarea_.height);
         prev_right_edge = (*bounds)[i].right() +
             (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0);
       }
@@ -811,9 +847,11 @@ void LayoutManager2::ComputeBrowserWindowBounds(vector<Rect>* bounds,
       for (int i = right_index + 1; i < num_browser_windows(); ++i) {
         BrowserWindow* browser = browser_windows_[i].get();
         (*bounds)[i].reset(
-            prev_left_edge + wm_->width() - browser->unmaximized_width() -
-              (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0), 0,
-            browser->unmaximized_width(), wm_->height());
+            prev_left_edge + workarea_.width - browser->unmaximized_width() -
+              (i < num_browser_windows() - 1 ? kEdgeGapPixels : 0),
+            workarea_.y,
+            browser->unmaximized_width(),
+            workarea_.height);
         prev_left_edge = (*bounds)[i].x - (i >= 1 ? kEdgeGapPixels : 0);
       }
       break;
@@ -1252,7 +1290,7 @@ void LayoutManager2::ConfigureResizeHandle() {
             (browser->anchored_to_left() ? browser->unmaximized_width() : 0);
     if (!browser->anchored_to_left())
       x -= kResizeHandleWidthPixels;
-    Rect bounds(x, 0, kResizeHandleWidthPixels, wm_->height());
+    Rect bounds(x, workarea_.y, kResizeHandleWidthPixels, workarea_.height);
     wm_->ConfigureInputWindow(resize_handle_xid_, bounds);
 
     XID cursor = browser->anchored_to_left() ? right_cursor_ : left_cursor_;
@@ -1264,7 +1302,8 @@ void LayoutManager2::ConfigureEdgeInputWindows(int left_offscreen_index,
                                                int right_offscreen_index) {
   if (left_offscreen_index != -1) {
     wm_->ConfigureInputWindow(
-        left_edge_input_xid_, Rect(0, 0, kEdgeGapPixels, wm_->height()));
+        left_edge_input_xid_,
+        Rect(workarea_.x, workarea_.y, kEdgeGapPixels, workarea_.height));
   } else {
     wm_->xconn()->ConfigureWindowOffscreen(left_edge_input_xid_);
   }
@@ -1272,7 +1311,8 @@ void LayoutManager2::ConfigureEdgeInputWindows(int left_offscreen_index,
   if (right_offscreen_index != -1) {
     wm_->ConfigureInputWindow(
         right_edge_input_xid_,
-        Rect(wm_->width() - kEdgeGapPixels, 0, kEdgeGapPixels, wm_->height()));
+        Rect(workarea_.right() - kEdgeGapPixels, workarea_.y,
+             kEdgeGapPixels, workarea_.height));
   } else {
     wm_->xconn()->ConfigureWindowOffscreen(right_edge_input_xid_);
   }
@@ -1288,8 +1328,8 @@ void LayoutManager2::HandleResizeDragStart(const Point& absolute_pos) {
   resize_width_at_start_ = active_browser->unmaximized_width();
 
   resize_box_.reset(new ResizeBox(wm_->compositor()));
-  Rect bounds(active_browser->win()->client_x(), 0,
-              active_browser->unmaximized_width(), wm_->height());
+  Rect bounds(active_browser->win()->client_x(), workarea_.y,
+              active_browser->unmaximized_width(), workarea_.height);
   resize_box_->SetBounds(bounds, 0);
   resize_box_->actor()->SetOpacity(kResizeBoxOpacity, 0);
   resize_box_->actor()->Show();
@@ -1307,7 +1347,8 @@ void LayoutManager2::HandleResizeDragMotion(const Point& absolute_pos) {
       (active_browser->anchored_to_left() ? 1 : -1) * dx;
   width = ConstrainUnmaximizedWidth(width);
 
-  Rect bounds(active_browser->win()->client_x(), 0, width, wm_->height());
+  Rect bounds(active_browser->win()->client_x(), workarea_.y,
+              width, workarea_.height);
   if (!active_browser->anchored_to_left())
     bounds.x -= (width - resize_width_at_start_);
   resize_box_->SetBounds(bounds, 0);

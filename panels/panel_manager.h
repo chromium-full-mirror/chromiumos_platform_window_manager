@@ -42,11 +42,33 @@ class PanelManagerAreaChangeListener {
   ~PanelManagerAreaChangeListener() {}
 };
 
+// Interface for classes that report changes to the area consumed onscreen by
+// the PanelManager.  PanelManager is the only real implementation; this just
+// exists so tests can create mock implementations.
+class PanelManagerAreaChangeNotifier {
+ public:
+  // Register or unregister a listener that will be notified when the
+  // screen area consumed by the PanelManager changes.
+  virtual void RegisterAreaChangeListener(
+      PanelManagerAreaChangeListener* listener) = 0;
+  virtual void UnregisterAreaChangeListener(
+      PanelManagerAreaChangeListener* listener) = 0;
+
+  // Get the area currently consumed by panel docks on the left and right
+  // edges of the screen.
+  virtual void GetArea(int* left_width, int* right_width) const = 0;
+
+ protected:
+  ~PanelManagerAreaChangeNotifier() {}
+};
+
 // Handles map/unmap events for panel windows, owns Panel and
 // PanelContainer objects, adds new panels to the appropriate container,
 // routes X events to panels and containers, coordinates drags of panels
 // between containers, etc.
-class PanelManager : public EventConsumer, public FocusChangeListener {
+class PanelManager : public EventConsumer,
+                     public FocusChangeListener,
+                     public PanelManagerAreaChangeNotifier {
  public:
   // Width of panel docks.
   static const int kPanelDockWidth;
@@ -102,6 +124,13 @@ class PanelManager : public EventConsumer, public FocusChangeListener {
   // FocusChangeListener implementation.
   virtual void HandleFocusChange();
 
+  // PanelManagerAreaChangeNotifier implementation.
+  virtual void RegisterAreaChangeListener(
+      PanelManagerAreaChangeListener* listener);
+  virtual void UnregisterAreaChangeListener(
+      PanelManagerAreaChangeListener* listener);
+  virtual void GetArea(int* left_width, int* right_width) const;
+
   // Handle notification from a panel that it's been resized by the user.
   // We just forward this through to its container, if any.
   void HandlePanelResizeByUser(Panel* panel);
@@ -114,15 +143,6 @@ class PanelManager : public EventConsumer, public FocusChangeListener {
   // sense to take the focus (currently, we only take the focus if there's
   // at least one expanded panel).
   bool TakeFocus(XTime timestamp);
-
-  // Register or unregister a listener that will be notified when the
-  // screen area consumed by the PanelManager changes.
-  void RegisterAreaChangeListener(PanelManagerAreaChangeListener* listener);
-  void UnregisterAreaChangeListener(PanelManagerAreaChangeListener* listener);
-
-  // Get the area currently consumed by panel docks on the left and right
-  // edges of the screen.
-  void GetArea(int* left_width, int* right_width) const;
 
  private:
   friend class BasicWindowManagerTest;  // uses |dragged_panel_event_coalescer_|

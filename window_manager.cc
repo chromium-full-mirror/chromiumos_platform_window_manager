@@ -519,6 +519,7 @@ void WindowManager::SetLoggedInState(bool logged_in, bool initial) {
 
     DCHECK(!layout_manager_.get());
     layout_manager_.reset(new LayoutManager2(this));
+    layout_manager_->SetPanelAreaNotifier(panel_manager_.get());
     event_consumers_.insert(layout_manager_.get());
 
     // We've probably already dropped the background containing the initial

@@ -20,6 +20,7 @@
 #include "window_manager/focus_manager.h"
 #include "window_manager/geometry.h"
 #include "window_manager/modality_handler.h"
+#include "window_manager/panels/panel_manager.h"
 #include "window_manager/wm_ipc.h"
 #include "window_manager/x11/x_types.h"
 
@@ -35,7 +36,8 @@ class WindowManager;
 
 class LayoutManager2 : public EventConsumer,
                        public FocusChangeListener,
-                       public ModalityChangeListener {
+                       public ModalityChangeListener,
+                       public PanelManagerAreaChangeListener {
  public:
   explicit LayoutManager2(WindowManager* wm);
   virtual ~LayoutManager2();
@@ -96,12 +98,20 @@ class LayoutManager2 : public EventConsumer,
   // ModalityChangeListener implementation.
   virtual void HandleModalityChange();
 
+  // PanelManagerAreaChangeListener implementation.
+  virtual void HandlePanelManagerAreaChange();
+
   // Assign the input focus to the fullscreen/active browser if possible.
   // Returns false if we were unable to take the focus.
   bool TakeFocus(XTime timestamp);
 
+  // The PanelManager is typically passed in here, but it's decoupled from the
+  // c'tor so it can be set by tests.
+  void SetPanelAreaNotifier(PanelManagerAreaChangeNotifier* notifier);
+
  private:
   friend class LayoutManager2Test;
+  FRIEND_TEST(LayoutManager2Test, ResizeScreen);
   FRIEND_TEST(LayoutManager2Test, InitialBrowserWindow);
   FRIEND_TEST(LayoutManager2Test, MultipleWindowLayout);
   FRIEND_TEST(LayoutManager2Test, ClickToActivateBrowser);
@@ -184,6 +194,10 @@ class LayoutManager2 : public EventConsumer,
   // handling a key binding, returns the time from the event; otherwise, fetches
   // the current time from the server.
   XTime GetCurrentXTime();
+
+  // Save the area available for layout to |workarea_| and reconfigure browser
+  // windows as needed.
+  void MoveAndResizeForAvailableArea();
 
   // Register all of our key bindings.  Called once during initialization.
   void InitKeyBindings();
@@ -287,6 +301,14 @@ class LayoutManager2 : public EventConsumer,
 
   WindowManager* wm_;  // not owned
 
+  // Typically the PanelManager, although it can be set by tests.
+  // NULL until SetPanelAreaNotifier() is called.
+  PanelManagerAreaChangeNotifier* panel_area_notifier_;  // not owned
+
+  // Area where we lay out browser windows which we intend to be visible.
+  // Note that other browser windows may extend outside of this area.
+  Rect workarea_;
+
   scoped_ptr<EventConsumerRegistrar> event_consumer_registrar_;
   scoped_ptr<KeyBindingsActionRegistrar> key_bindings_actions_;
 
@@ -342,9 +364,6 @@ class LayoutManager2 : public EventConsumer,
 
   // Box displayed to show the current window dimensions while resizing.
   scoped_ptr<ResizeBox> resize_box_;
-
-  // Last-seen size of the screen.
-  Size last_screen_size_;
 
   // Have we seen a browser window get mapped yet?
   bool first_browser_window_mapped_;
