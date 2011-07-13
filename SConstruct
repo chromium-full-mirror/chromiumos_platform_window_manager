@@ -47,6 +47,13 @@ base_env.ParseConfig(pkgconfig + ' --cflags --libs glib-2.0 x11')
 # program.
 screenshot_env = base_env.Clone()
 screenshot_env.ParseConfig(pkgconfig + ' --cflags --libs cairo')
+if ARGUMENTS.get('GLOG', None):
+  # Provide a way to compile the screenshot program without
+  # libbase/libchrome; it only uses the portion of libbase that's derived
+  # from google-glog, and the program can be handy on other platforms.
+  screenshot_env.Append(CPPDEFINES=['USE_GLOG'])
+  screenshot_env['LIBS'].remove('base')
+  screenshot_env.Append(LIBS=['glog'])
 screenshot_env.Program('screenshot', 'screenshot.cc')
 
 # Check for BACKEND on the build line

@@ -115,7 +115,7 @@ static const char* kToggleProfilerAction = "toggle-profiler";
 #endif
 
 static const char* kTakeRootScreenshotAction = "take-root-screenshot";
-static const char* kTakeWindowScreenshotAction = "take-window-screenshot";
+static const char* kTakeRegionScreenshotAction = "take-region-screenshot";
 
 const int WindowManager::kVideoTimePropertyUpdateSec = 5;
 
@@ -1159,12 +1159,16 @@ void WindowManager::RegisterKeyBindings() {
       KeyBindings::KeyCombo(XK_Print, 0), kTakeRootScreenshotAction);
 
   key_bindings_actions_->AddAction(
-      kTakeWindowScreenshotAction,
+      kTakeRegionScreenshotAction,
       NewPermanentCallback(this, &WindowManager::TakeScreenshot, true),
       NULL, NULL);
   key_bindings_->AddBinding(
+      KeyBindings::KeyCombo(
+          XK_F5, KeyBindings::kControlMask | KeyBindings::kShiftMask),
+      kTakeRegionScreenshotAction);
+  key_bindings_->AddBinding(
       KeyBindings::KeyCombo(XK_Print, KeyBindings::kShiftMask),
-      kTakeWindowScreenshotAction);
+      kTakeRegionScreenshotAction);
 }
 
 bool WindowManager::ManageExistingWindows() {
@@ -1988,7 +1992,7 @@ XWindow WindowManager::GetArbitraryChromeWindow() {
   return 0;
 }
 
-void WindowManager::TakeScreenshot(bool use_active_window) {
+void WindowManager::TakeScreenshot(bool select_region) {
   const string& dir = logged_in_ ?
       FLAGS_logged_in_screenshot_output_dir :
       FLAGS_logged_out_screenshot_output_dir;
@@ -2002,13 +2006,8 @@ void WindowManager::TakeScreenshot(bool use_active_window) {
   vector<string> argv;
   argv.push_back(FLAGS_screenshot_binary);
 
-  if (use_active_window) {
-    if (!active_window_xid_) {
-      LOG(WARNING) << "No active window to use for screenshot";
-      return;
-    }
-    argv.push_back(StringPrintf("--window=0x%lx", active_window_xid_));
-  }
+  if (select_region)
+    argv.push_back("--region");
 
   string filename = StringPrintf("%s/screenshot-%s.png", dir.c_str(),
                                  GetTimeAsString(GetCurrentTimeSec()).c_str());

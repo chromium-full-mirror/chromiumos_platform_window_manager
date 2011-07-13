@@ -443,11 +443,10 @@ class WindowManager : public PanelManagerAreaChangeListener,
   // doesn't matter.  Returns 0 if there aren't any Chrome windows.
   XWindow GetArbitraryChromeWindow();
 
-  // Write a screenshot to disk.  If |use_active_window| is true, the
-  // screenshot will contain the currently-active client window's offscreen
-  // pixmap.  Otherwise, the composited image from the root window will be
-  // captured.
-  void TakeScreenshot(bool use_active_window);
+  // Write a screenshot to disk.  If |select_region| is true, the
+  // user will have a chance to select a region to capture.  Otherwise, the
+  // entire root window will be captured.
+  void TakeScreenshot(bool select_region);
 
   // Initialize |startup_background_| to hold a new actor that displays the
   // initial contents of the root window.  Called by Init().
