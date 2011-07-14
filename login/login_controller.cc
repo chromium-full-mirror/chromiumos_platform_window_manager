@@ -101,6 +101,7 @@ LoginController::LoginController(WindowManager* wm)
     : wm_(wm),
       registrar_(wm, this),
       views_windows_are_ready_(false),
+      webui_window_is_ready_(false),
       selected_entry_index_(kNoSelection),
       selection_changed_manager_(this),
       wizard_window_(NULL),
@@ -405,6 +406,7 @@ void LoginController::HandleWindowUnmap(Window* win) {
   } else if (win == webui_window_) {
     registrar_.UnregisterForWindowEvents(webui_window_->xid());
     webui_window_ = NULL;
+    webui_window_is_ready_ = false;
   } else if (win == wizard_window_) {
     registrar_.UnregisterForWindowEvents(wizard_window_->xid());
     wizard_window_ = NULL;
@@ -884,7 +886,7 @@ bool LoginController::AreViewsWindowsReady() {
 
 void LoginController::DoInitialSetupIfWindowsAreReady() {
   // Bail if we already handled this.
-  if (views_windows_are_ready_)
+  if (views_windows_are_ready_ || webui_window_is_ready_)
     return;
 
   if (AreViewsWindowsReady()) {
@@ -938,6 +940,7 @@ void LoginController::DoInitialSetupIfWindowsAreReady() {
     FocusLoginWindow(wizard_window_);
     NotifySessionManager();
   } else if (IsWebUIWindowReady()) {
+    webui_window_is_ready_ = true;
     webui_window_->MoveClient(
         (wm_->width() - webui_window_->client_width()) / 2,
         (wm_->height() - webui_window_->client_height()) / 2);

@@ -232,9 +232,12 @@ class LoginController : public EventConsumer {
   // the entry.
   Entries entries_;
 
-  // Did we get all the regular login (i.e. non-wizard, views based) windows and
-  // show them?
+  // Did we already get all the regular login (i.e. non-wizard, views based)
+  // windows and show them?
   bool views_windows_are_ready_;
+
+  // Did we already show the WebUI window?
+  bool webui_window_is_ready_;
 
   // Index of the selected entry.
   size_t selected_entry_index_;
