@@ -180,6 +180,23 @@ void TransientWindowCollection::RemoveWindow(Window* transient_win) {
   }
 }
 
+void TransientWindowCollection::HandleWindowModalityChange(
+    Window* transient_win) {
+  if (transient_win->wm_state_modal()) {
+    // If this window just became modal, focus it.
+    transient_to_focus_ = GetTransientWindow(*transient_win);
+  } else {
+    // Otherwise, if it's not modal but we were previously preferring it, make
+    // sure that there aren't any other transient windows that we should focus
+    // instead.
+    if (transient_to_focus_ && transient_to_focus_->win == transient_win) {
+      TransientWindow* preferred_transient = FindTransientWindowToFocus();
+      if (preferred_transient && preferred_transient->win->wm_state_modal())
+        transient_to_focus_ = preferred_transient;
+    }
+  }
+}
+
 void TransientWindowCollection::ConfigureAllWindowsRelativeToOwner(
     int anim_ms) {
   for (TransientWindowMap::iterator it = transients_.begin();

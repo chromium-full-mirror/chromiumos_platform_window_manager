@@ -177,6 +177,10 @@ class BasicWindowManagerTest : public ::testing::Test {
   // window.
   void SendActiveWindowMessage(XWindow xid);
 
+  // Send a message to the window manager asking it to set or unset |state_atom|
+  // (e.g. _NET_WM_STATE_MODAL) in |xid|'s _NET_WM_STATE property.
+  void SendWmStateMessage(XWindow xid, XAtom state_atom, bool set);
+
   // Initialize a ConfigureNotify event for |xid|'s current bounds and stacking
   // and pass it to WindowManager::HandleEvent().
   void SendConfigureNotifyEvent(XWindow xid);

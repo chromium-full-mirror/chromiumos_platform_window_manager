@@ -97,6 +97,12 @@ class TransientWindowCollection {
   // This should be called in response to the window being unmapped.
   void RemoveWindow(Window* transient_win);
 
+  // Handle a change in |transient_win|'s modality.
+  // If it's modal, then we set it as the preferred window to focus; if it's
+  // non-modal, then we check if there's another still-modal window that we
+  // should be focusing instead.
+  void HandleWindowModalityChange(Window* transient_win);
+
   // Update all transient windows' positions and scales based on the owner
   // window's position and scale.
   void ConfigureAllWindowsRelativeToOwner(int anim_ms);

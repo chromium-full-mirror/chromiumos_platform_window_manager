@@ -1447,7 +1447,8 @@ void LayoutManager2::HandleModalityRequest(Window* win, bool modal) {
   new_state[wm_->GetXAtom(ATOM_NET_WM_STATE_MODAL)] = modal;
   win->ChangeWmState(new_state);
 
-  if (modal)
+  owning_browser->HandleTransientWindowModalityChange(win);
+  if (modal || owning_browser == GetActiveBrowserWindow())
     FocusBrowserWindow(owning_browser);
 }
 

@@ -82,8 +82,12 @@ class BrowserWindow {
 
   // Specify that a previously-registered transient window should get the input
   // focus the next time that TakeFocus() is called.  NULL can be passed to make
-  // the browser window itself get the focus.
+  // the browser window itself get the focus (assuming that no modal transients
+  // are mapped).
   void SetPreferredTransientWindowToFocus(Window* transient_win);
+
+  // Handle one of this browser's transient windows' modality changing.
+  void HandleTransientWindowModalityChange(Window* transient_win);
 
   // Show or hide all of this browser's transient windows.
   void SetTransientWindowVisibility(bool shown);

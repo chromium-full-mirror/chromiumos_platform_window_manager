@@ -168,6 +168,10 @@ void BrowserWindow::SetPreferredTransientWindowToFocus(Window* transient_win) {
   transients_->SetPreferredWindowToFocus(transient_win);
 }
 
+void BrowserWindow::HandleTransientWindowModalityChange(Window* transient_win) {
+  transients_->HandleWindowModalityChange(transient_win);
+}
+
 void BrowserWindow::SetTransientWindowVisibility(bool shown) {
   if (shown)
     transients_->Show();

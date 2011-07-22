@@ -380,13 +380,29 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
   SendKey(xconn_->GetRootWindow(), kAltTabKeyCombo, kEventTime, kEventTime);
   EXPECT_EQ(transient_xid2, xconn_->focused_xid());
 
-  // Send an event asking for |transient_xid2| to be made non-modal.
-  xconn_->InitClientMessageEvent(
-      &event, transient_xid2, kWmStateAtom, 0, kWmStateModalAtom, 0, 0, 0);
-  wm_->HandleEvent(&event);
-  xconn_->InitPropertyNotifyEvent(&event, transient_xid2, kWmStateAtom);
-  wm_->HandleEvent(&event);
+  // Send an event asking for |transient_xid3| to be made modal.  It should be
+  // focused and raised on top of |transient_xid2| (see
+  // http://crosbug.com/17642).
+  SendWmStateMessage(transient_xid3, kWmStateModalAtom, true);
+  EXPECT_EQ(transient_xid3, xconn_->focused_xid());
+  EXPECT_TRUE(
+      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid3),
+                                   wm_->GetWindowOrDie(transient_xid2)));
+
+  // Send an event asking for |transient_xid3| to be made non-modal.
+  // Since |transient_xid2| is still modal, it should now be focused and on top.
+  SendWmStateMessage(transient_xid3, kWmStateModalAtom, false);
   EXPECT_EQ(transient_xid2, xconn_->focused_xid());
+  EXPECT_TRUE(
+      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid2),
+                                   wm_->GetWindowOrDie(transient_xid3)));
+
+  // Now make |transient_xid2| non-modal as well.
+  SendWmStateMessage(transient_xid2, kWmStateModalAtom, false);
+  EXPECT_EQ(transient_xid2, xconn_->focused_xid());
+  EXPECT_TRUE(
+      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid2),
+                                   wm_->GetWindowOrDie(transient_xid3)));
 
   // Click on |xid2| and check that it takes the focus.
   xconn_->set_pointer_grab_xid(xid2);
@@ -408,11 +424,7 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
 
   // Send a message asking for |transient_xid| to be made modal.
   // We should focus it and automatically switch to |xid|.
-  xconn_->InitClientMessageEvent(
-      &event, transient_xid, kWmStateAtom, 1, kWmStateModalAtom, 0, 0, 0);
-  wm_->HandleEvent(&event);
-  xconn_->InitPropertyNotifyEvent(&event, transient_xid, kWmStateAtom);
-  wm_->HandleEvent(&event);
+  SendWmStateMessage(transient_xid, kWmStateModalAtom, true);
   EXPECT_EQ(transient_xid, xconn_->focused_xid());
   EXPECT_EQ(xconn_->root_bounds(), xconn_->GetWindowInfoOrDie(xid)->bounds);
   EXPECT_EQ(xconn_->root_bounds(), GetCompositedWindowBounds(xid));
@@ -478,10 +490,7 @@ TEST_F(LayoutManager2Test, LegacyFullscreen) {
 
   // Request that the window be made fullscreen.  Check that the fullscreen hint
   // is set on it and that it's restacked.
-  XEvent event;
-  xconn_->InitClientMessageEvent(
-      &event, xid, kWmStateAtom, 1, kWmStateFullscreenAtom, 0, 0, 0);
-  wm_->HandleEvent(&event);
+  SendWmStateMessage(xid, kWmStateFullscreenAtom, true);
   EXPECT_EQ(xid, xconn_->focused_xid());
   EXPECT_EQ(wm_->root_bounds(), info->bounds);
   EXPECT_EQ(wm_->root_bounds(), GetCompositedWindowBounds(xid));
@@ -522,17 +531,13 @@ TEST_F(LayoutManager2Test, LegacyFullscreen) {
       IntArrayPropertyContains(xid3, kWmStateAtom, kWmStateFullscreenAtom));
 
   // Send a message to make the first window fullscreen again...
-  xconn_->InitClientMessageEvent(
-      &event, xid, kWmStateAtom, 1, kWmStateFullscreenAtom, 0, 0, 0);
-  wm_->HandleEvent(&event);
+  SendWmStateMessage(xid, kWmStateFullscreenAtom, true);
   EXPECT_TRUE(WindowIsInLayer(win, StackingManager::LAYER_FULLSCREEN_WINDOW));
   EXPECT_TRUE(
       IntArrayPropertyContains(xid, kWmStateAtom, kWmStateFullscreenAtom));
 
   // ... and then send a message to make it not fullscreen.
-  xconn_->InitClientMessageEvent(
-      &event, xid, kWmStateAtom, 0, kWmStateFullscreenAtom, 0, 0, 0);
-  wm_->HandleEvent(&event);
+  SendWmStateMessage(xid, kWmStateFullscreenAtom, false);
   EXPECT_TRUE(
       WindowIsInLayer(win, StackingManager::LAYER_ACTIVE_BROWSER_WINDOW));
   EXPECT_FALSE(
@@ -540,18 +545,15 @@ TEST_F(LayoutManager2Test, LegacyFullscreen) {
 
   // Creating a panel (which will take the focus) should also unfullscreen the
   // browser.
-  xconn_->InitClientMessageEvent(
-      &event, xid, kWmStateAtom, 1, kWmStateFullscreenAtom, 0, 0, 0);
-  wm_->HandleEvent(&event);
+  SendWmStateMessage(xid, kWmStateFullscreenAtom, true);
   Panel* panel = CreatePanel(200, 20, 400);
   ASSERT_EQ(panel->content_xid(), xconn_->focused_xid());
   EXPECT_FALSE(
       IntArrayPropertyContains(xid, kWmStateAtom, kWmStateFullscreenAtom));
 
   // Check that we don't crash when a fullscreen window is unmapped.
-  xconn_->InitClientMessageEvent(
-      &event, xid, kWmStateAtom, 1, kWmStateFullscreenAtom, 0, 0, 0);
-  wm_->HandleEvent(&event);
+  SendWmStateMessage(xid, kWmStateFullscreenAtom, true);
+  XEvent event;
   xconn_->InitUnmapEvent(&event, xid);
   wm_->HandleEvent(&event);
 }

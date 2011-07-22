@@ -401,6 +401,20 @@ void BasicWindowManagerTest::SendActiveWindowMessage(XWindow xid) {
   wm_->HandleEvent(&event);
 }
 
+void BasicWindowManagerTest::SendWmStateMessage(XWindow xid,
+                                                XAtom state_atom,
+                                                bool set) {
+  const XAtom prop_atom = xconn_->GetAtomOrDie("_NET_WM_STATE");
+  XEvent event;
+  xconn_->InitClientMessageEvent(
+      &event, xid, prop_atom, set, state_atom, 0, 0, 0);
+  wm_->HandleEvent(&event);
+  // Assuming that the window manager changed the property as requested, tell it
+  // to take another look.
+  xconn_->InitPropertyNotifyEvent(&event, xid, prop_atom);
+  wm_->HandleEvent(&event);
+}
+
 void BasicWindowManagerTest::SendConfigureNotifyEvent(XWindow xid) {
   XEvent event;
   xconn_->InitConfigureNotifyEvent(&event, xid);
