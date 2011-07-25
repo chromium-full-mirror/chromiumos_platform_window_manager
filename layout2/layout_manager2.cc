@@ -91,6 +91,7 @@ const double kSecondaryBrowserWindowDimAnimMs = 10000;
 
 // Key binding action names.
 const char kActivateBrowserByIndexActionFormat[] = "activate-browser-%d";
+const char kActivateLastBrowserAction[] = "activate-last-browser";
 const char kCloseFocusedNonChromeWindowAction[] = "close-non-chrome-window";
 const char kCycleBackwardAction[] = "cycle-browser-backward";
 const char kCycleForwardAction[] = "cycle-browser-forward";
@@ -631,6 +632,15 @@ void LayoutManager2::InitKeyBindings() {
         action_name);
   }
 
+  key_bindings_actions_->AddAction(
+      kActivateLastBrowserAction,
+      NewPermanentCallback(
+          this, &LayoutManager2::ActivateBrowserWindowByIndex, -1),
+      NULL, NULL);
+  key_bindings_group_->AddBinding(
+      KeyBindings::KeyCombo(XK_9, KeyBindings::kAltMask),
+      kActivateLastBrowserAction);
+
   if (FLAGS_multiple_windows) {
     key_bindings_actions_->AddAction(
         kToggleMaximizedAction,
@@ -1129,6 +1139,12 @@ void LayoutManager2::CycleActiveBrowserWindow(bool forward) {
 }
 
 void LayoutManager2::ActivateBrowserWindowByIndex(int browser_index) {
+  if (browser_windows_.empty())
+    return;
+
+  if (browser_index < 0)
+    browser_index += num_browser_windows();
+
   if (browser_index < 0 || browser_index >= num_browser_windows())
     return;
   if (browser_index == active_browser_index_)

@@ -240,7 +240,8 @@ class LayoutManager2 : public EventConsumer,
   // Calls ArrangeBrowserWindows() itself.
   void CycleActiveBrowserWindow(bool forward);
 
-  // Activate the browser window at index |browser_index|.  Effectively, just
+  // Activate the browser window at index |browser_index|.  -1 activates the
+  // last browser window, -2 the second-to-last, and so on.  Effectively, just
   // here so it can be used as a callback that calls both
   // SetActiveBrowserWindow() and ArrangeBrowserWindows().
   void ActivateBrowserWindowByIndex(int browser_index);

@@ -1312,6 +1312,39 @@ TEST_F(LayoutManager2Test, UnmapTransientAfterOwner) {
   wm_->HandleEvent(&event);
 }
 
+// Test the Alt-number hotkeys for switching windows.
+TEST_F(LayoutManager2Test, SwitchWindowHotkeys) {
+  vector<XWindow> windows;
+  const int kNumWindows = 15;
+  for (int i = 0; i < kNumWindows; ++i) {
+    XWindow xid = CreateSimpleWindow();
+    SendInitialEventsForWindow(xid);
+    windows.push_back(xid);
+  }
+
+  // Initially, the last window should be focused.
+  EXPECT_EQ(windows[kNumWindows-1], xconn_->focused_xid());
+
+  // Alt-1 should focus the first window.
+  const XTime kEventTime = wm_->GetCurrentTimeFromServer();
+  SendKey(xconn_->GetRootWindow(),
+          KeyBindings::KeyCombo(XK_1, KeyBindings::kAltMask),
+          kEventTime, kEventTime);
+  EXPECT_EQ(windows[0], xconn_->focused_xid());
+
+  // Alt-8 should focus the eighth window.
+  SendKey(xconn_->GetRootWindow(),
+          KeyBindings::KeyCombo(XK_8, KeyBindings::kAltMask),
+          kEventTime, kEventTime);
+  EXPECT_EQ(windows[7], xconn_->focused_xid());
+
+  // Alt-9 should focus the last window rather than the ninth.
+  SendKey(xconn_->GetRootWindow(),
+          KeyBindings::KeyCombo(XK_9, KeyBindings::kAltMask),
+          kEventTime, kEventTime);
+  EXPECT_EQ(windows[kNumWindows-1], xconn_->focused_xid());
+}
+
 }  // namespace window_manager
 
 int main(int argc, char** argv) {
