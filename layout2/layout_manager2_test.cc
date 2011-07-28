@@ -981,6 +981,12 @@ TEST_F(LayoutManager2Test, ResizeBrowser) {
   old_width = info1->bounds.width;
   SendKey(xconn_->GetRootWindow(), kAltPeriodKeyCombo, kEventTime, kEventTime);
   EXPECT_GT(info1->bounds.width, old_width);
+
+  // Check that we can switch to maximized mode by dragging the resize handle
+  // all the way over.
+  DragResizeHandle(kRootBounds.width);
+  EXPECT_TRUE(layout_manager()->maximized());
+  EXPECT_EQ(kRootBounds, info1->bounds);
 }
 
 TEST_F(LayoutManager2Test, SetLayoutMode) {

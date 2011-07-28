@@ -42,6 +42,7 @@ DEFINE_bool(multiple_windows, true,
 
 DEFINE_string(xterm_command, "xterm", "Command to launch a terminal");
 
+using base::TimeTicks;
 using chromeos::WM_IPC_LAYOUT_MAXIMIZED;
 using chromeos::WM_IPC_LAYOUT_OVERLAPPING;
 using chromeos::WmIpcLayoutMode;
@@ -53,6 +54,7 @@ using std::set;
 using std::string;
 using std::tr1::shared_ptr;
 using std::vector;
+using window_manager::util::GetMonotonicTime;
 using window_manager::util::RunCommandInBackgroundCallback;
 using window_manager::util::ToggleBool;
 using window_manager::util::XidStr;
@@ -85,6 +87,15 @@ const int kResizeHandleWidthPixels = 12;
 
 // Opacity of the box that we display while the user is resizing a window.
 const double kResizeBoxOpacity = 0.4;
+
+// When a browser window is being interactively resized, how much wider than the
+// maximum width for an unmaximized window does it need to get before we snap it
+// to cover the whole screen and enter maximized mode?
+const int kResizeSnapThresholdPixels = 50;
+
+// Duration of the snapping-to-cover-the-whole-screen animation, in
+// milliseconds.
+const int kResizeBoxSnapAnimMs = 100;
 
 // Duration over which we dim the secondary browser window, in milliseconds.
 const double kSecondaryBrowserWindowDimAnimMs = 10000;
@@ -130,6 +141,7 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
           wm_->CreateInputWindow(Rect(-1, -1, 1, 1), ButtonPressMask)),
       in_resize_drag_(false),
       resize_width_at_start_(0),
+      resize_box_is_snapped_(false),
       first_browser_window_mapped_(false) {
   event_consumer_registrar_->RegisterForChromeMessages(
       chromeos::WM_IPC_MESSAGE_WM_CYCLE_WINDOWS);
@@ -1342,6 +1354,8 @@ void LayoutManager2::HandleResizeDragStart(const Point& absolute_pos) {
   in_resize_drag_ = true;
   resize_drag_start_pos_ = absolute_pos;
   resize_width_at_start_ = active_browser->unmaximized_width();
+  resize_box_is_snapped_ = false;
+  resize_box_unsnap_time_ = TimeTicks();
 
   resize_box_.reset(new ResizeBox(wm_->compositor()));
   Rect bounds(active_browser->win()->client_x(), workarea_.y,
@@ -1361,13 +1375,41 @@ void LayoutManager2::HandleResizeDragMotion(const Point& absolute_pos) {
   int width =
       resize_width_at_start_ +
       (active_browser->anchored_to_left() ? 1 : -1) * dx;
-  width = ConstrainUnmaximizedWidth(width);
 
-  Rect bounds(active_browser->win()->client_x(), workarea_.y,
-              width, workarea_.height);
-  if (!active_browser->anchored_to_left())
-    bounds.x -= (width - resize_width_at_start_);
-  resize_box_->SetBounds(bounds, 0);
+  if (width >= GetMaxUnmaximizedWidth() + kResizeSnapThresholdPixels) {
+    if (!resize_box_is_snapped_) {
+      resize_box_is_snapped_ = true;
+      resize_box_->SetBounds(workarea_, kResizeBoxSnapAnimMs);
+      last_resize_box_bounds_ = workarea_;
+    }
+  } else {
+    width = ConstrainUnmaximizedWidth(width);
+    Rect bounds(active_browser->win()->client_x(), workarea_.y,
+                width, workarea_.height);
+    if (!active_browser->anchored_to_left())
+      bounds.x -= (width - resize_width_at_start_);
+
+    TimeTicks now = GetMonotonicTime();
+    if (resize_box_is_snapped_) {
+      resize_box_is_snapped_ = false;
+      resize_box_unsnap_time_ = now;
+    }
+
+    if (bounds != last_resize_box_bounds_) {
+      int anim_ms = 0;
+      if (!resize_box_unsnap_time_.is_null()) {
+        // Restarting the unsnap animation like this is a bit hacky.  Ideally,
+        // we'd be able to adjust the endpoint of the existing unsnap animation
+        // or make the animations (if any) created by the SetBounds() call start
+        // at full speed.  This seems to look okay, though...
+        const int elapsed_ms = static_cast<int>(
+            (now - resize_box_unsnap_time_).InMilliseconds());
+        anim_ms = max(0, kResizeBoxSnapAnimMs - elapsed_ms);
+      }
+      resize_box_->SetBounds(bounds, anim_ms);
+      last_resize_box_bounds_ = bounds;
+    }
+  }
 }
 
 void LayoutManager2::HandleResizeDragEnd(const Point& absolute_pos) {
@@ -1382,7 +1424,11 @@ void LayoutManager2::HandleResizeDragEnd(const Point& absolute_pos) {
   int new_width =
       active_browser->unmaximized_width() +
       (active_browser->anchored_to_left() ? 1 : -1) * dx;
-  ChangeActiveBrowserUnmaximizedWidth(ConstrainUnmaximizedWidth(new_width));
+
+  if (new_width >= GetMaxUnmaximizedWidth() + kResizeSnapThresholdPixels)
+    SetLayoutMode(WM_IPC_LAYOUT_MAXIMIZED, true);
+  else
+    ChangeActiveBrowserUnmaximizedWidth(ConstrainUnmaximizedWidth(new_width));
 }
 
 void LayoutManager2::HandleWindowNoLongerBlockingArrange(Window* win) {
