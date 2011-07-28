@@ -14,6 +14,7 @@
 
 #include "base/basictypes.h"
 #include "base/scoped_ptr.h"
+#include "base/time.h"
 #include "cros/chromeos_wm_ipc_enums.h"
 #include "window_manager/compositor/compositor.h"
 #include "window_manager/event_consumer.h"
@@ -365,6 +366,16 @@ class LayoutManager2 : public EventConsumer,
 
   // Box displayed to show the current window dimensions while resizing.
   scoped_ptr<ResizeBox> resize_box_;
+
+  // Is |resize_box_| currently snapped to cover the whole workarea?
+  bool resize_box_is_snapped_;
+
+  // Last bounds used for configuring |resize_box_|.
+  Rect last_resize_box_bounds_;
+
+  // When the user drags the resize box to cover the whole screen and then drags
+  // it back, time at which we unsnapped the box from the maximized state.
+  base::TimeTicks resize_box_unsnap_time_;
 
   // Have we seen a browser window get mapped yet?
   bool first_browser_window_mapped_;
