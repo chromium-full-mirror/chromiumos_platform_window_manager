@@ -85,6 +85,16 @@ const int kStatusWidthPixels = 180;
 // browser window in non-maximized mode.
 const int kResizeHandleWidthPixels = 12;
 
+// Size of the box that we use to sorta-extend the window's shadow when the
+// pointer is in the resize handle.
+const int kResizeHandleShadowExtendPixels = 8;
+
+// Opacity of the box that we display when the pointer is in the resize handle.
+const double kResizeHandleShadowOpacity = 0.125;
+
+// Duration for resize handle animations, in milliseconds.
+const int kResizeHandleShadowAnimMs = 100;
+
 // Opacity of the box that we display while the user is resizing a window.
 const double kResizeBoxOpacity = 0.4;
 
@@ -132,7 +142,12 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
       layout_mode_(WM_IPC_LAYOUT_OVERLAPPING),
       fullscreen_browser_(NULL),
       anim_ms_for_pending_arrange_(0),
-      resize_handle_xid_(wm->CreateInputWindow(Rect(-1, -1, 1, 1), 0)),
+      resize_handle_xid_(
+          wm->CreateInputWindow(Rect(-1, -1, 1, 1),
+                                EnterWindowMask | LeaveWindowMask)),
+      resize_handle_actor_(
+          wm_->compositor()->CreateColoredBox(1, 1, Compositor::Color("#000"))),
+      resize_handle_actor_is_visible_(false),
       left_cursor_(wm_->xconn()->CreateShapedCursor(XC_left_side)),
       right_cursor_(wm_->xconn()->CreateShapedCursor(XC_right_side)),
       left_edge_input_xid_(
@@ -158,9 +173,16 @@ LayoutManager2::LayoutManager2(WindowManager* wm)
       StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
   event_consumer_registrar_->RegisterForWindowEvents(resize_handle_xid_);
   int event_mask = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
-  wm->xconn()->AddButtonGrabOnWindow(resize_handle_xid_, 1, event_mask, false);
-  wm->SetNamePropertiesForXid(resize_handle_xid_,
-                              "input window for browser resize");
+  wm_->xconn()->AddButtonGrabOnWindow(resize_handle_xid_, 1, event_mask, false);
+  wm_->SetNamePropertiesForXid(resize_handle_xid_,
+                               "input window for browser resize");
+
+  resize_handle_actor_->SetName("browser resize handle");
+  resize_handle_actor_->Move(-1, -1, 0);
+  resize_handle_actor_->SetOpacity(0, 0);
+  wm_->stage()->AddActor(resize_handle_actor_.get());
+  wm_->stacking_manager()->StackActorAtTopOfLayer(
+      resize_handle_actor_.get(), StackingManager::LAYER_ACTIVE_BROWSER_WINDOW);
 
   wm_->stacking_manager()->StackXidAtTopOfLayer(
       left_edge_input_xid_,
@@ -402,6 +424,40 @@ void LayoutManager2::HandleButtonRelease(XWindow xid,
       HandleResizeDragEnd(absolute_pos);
     return;
   }
+}
+
+void LayoutManager2::HandlePointerEnter(XWindow xid,
+                                        const Point& relative_pos,
+                                        const Point& absolute_pos,
+                                        XTime timestamp) {
+  DCHECK_EQ(xid, resize_handle_xid_);
+
+  BrowserWindow* browser = GetActiveBrowserWindow();
+  int x = browser->win()->client_x() +
+          (browser->anchored_to_left() ? browser->unmaximized_width() : 0);
+  resize_handle_actor_->Scale(0.0, 1.0, 0);
+  resize_handle_actor_->Move(x, workarea_.y, 0);
+  resize_handle_actor_->SetSize(kResizeHandleShadowExtendPixels,
+                                workarea_.height);
+
+  resize_handle_actor_->Scale(1.0, 1.0, kResizeHandleShadowAnimMs);
+  resize_handle_actor_->SetOpacity(kResizeHandleShadowOpacity,
+                                   kResizeHandleShadowAnimMs);
+  if (!browser->anchored_to_left()) {
+    resize_handle_actor_->MoveX(
+        x - kResizeHandleShadowExtendPixels, kResizeHandleShadowAnimMs);
+  }
+
+  resize_handle_actor_is_visible_ = true;
+}
+
+void LayoutManager2::HandlePointerLeave(XWindow xid,
+                                        const Point& relative_pos,
+                                        const Point& absolute_pos,
+                                        XTime timestamp) {
+  DCHECK_EQ(xid, resize_handle_xid_);
+  resize_handle_actor_->SetOpacity(0.0, kResizeHandleShadowAnimMs);
+  resize_handle_actor_is_visible_ = false;
 }
 
 void LayoutManager2::HandlePointerMotion(XWindow xid,
@@ -1323,6 +1379,17 @@ void LayoutManager2::ConfigureResizeHandle() {
 
     XID cursor = browser->anchored_to_left() ? right_cursor_ : left_cursor_;
     wm_->xconn()->SetWindowCursor(resize_handle_xid_, cursor);
+
+    // If we're showing the handle's actor, move it to the updated position.
+    if (resize_handle_actor_is_visible_) {
+      resize_handle_actor_->Scale(1.0, 1.0, 0);
+      resize_handle_actor_->MoveX(
+          browser->win()->client_x() +
+            (browser->anchored_to_left() ?
+             browser->unmaximized_width() :
+             -kResizeHandleShadowExtendPixels),
+          0);
+    }
   }
 }
 

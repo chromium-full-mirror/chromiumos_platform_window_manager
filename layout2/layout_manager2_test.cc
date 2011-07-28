@@ -989,6 +989,67 @@ TEST_F(LayoutManager2Test, ResizeBrowser) {
   EXPECT_EQ(kRootBounds, info1->bounds);
 }
 
+TEST_F(LayoutManager2Test, ResizeHandleActor) {
+  // Create and map two browser windows.
+  XWindow xid1 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info1 = xconn_->GetWindowInfoOrDie(xid1);
+  SendInitialEventsForWindow(xid1);
+
+  XWindow xid2 = CreateSimpleWindow();
+  MockXConnection::WindowInfo* info2 = xconn_->GetWindowInfoOrDie(xid2);
+  SendInitialEventsForWindow(xid2);
+  ASSERT_EQ(xid2, xconn_->focused_xid());
+
+  // The resize handle actor should initially be invisible.
+  Compositor::Actor* actor = layout_manager()->resize_handle_actor_.get();
+  EXPECT_DOUBLE_EQ(0.0, actor->GetOpacity());
+
+  // When the pointer enters the resize handle input window, the actor should
+  // become visible, and its right edge should be aligned with the left edge of
+  // the second browser window.
+  XEvent event;
+  xconn_->InitEnterWindowEvent(
+      &event, layout_manager()->resize_handle_xid_, Point(0, 0));
+  wm_->HandleEvent(&event);
+  EXPECT_GT(actor->GetOpacity(), 0.0);
+  EXPECT_EQ(info2->bounds.left(), actor->GetBounds().right());
+
+  // Drag the resize handle a pixel to the left, making the browser window
+  // bigger.  The actor's position should be updated.
+  DragResizeHandle(-1);
+  EXPECT_GT(actor->GetOpacity(), 0.0);
+  EXPECT_EQ(info2->bounds.left(), actor->GetBounds().right());
+
+  // Check that dragging to the right works as well.
+  DragResizeHandle(2);
+  EXPECT_GT(actor->GetOpacity(), 0.0);
+  EXPECT_EQ(info2->bounds.left(), actor->GetBounds().right());
+
+  // When the pointer leaves the input window, the actor should be invisible.
+  xconn_->InitLeaveWindowEvent(
+      &event, layout_manager()->resize_handle_xid_, Point(0, 0));
+  wm_->HandleEvent(&event);
+  EXPECT_DOUBLE_EQ(0.0, actor->GetOpacity());
+
+  // Focus the first window, move the pointer into the handle, and check that
+  // the actor's left edge lines up with the browser window's right edge.
+  SendActiveWindowMessage(xid1);
+  ASSERT_EQ(xid1, xconn_->focused_xid());
+  xconn_->InitEnterWindowEvent(
+      &event, layout_manager()->resize_handle_xid_, Point(0, 0));
+  wm_->HandleEvent(&event);
+  EXPECT_GT(actor->GetOpacity(), 0.0);
+  EXPECT_EQ(info1->bounds.right(), actor->GetBounds().x);
+
+  // Drag the handle in both directions again.
+  DragResizeHandle(-1);
+  EXPECT_GT(actor->GetOpacity(), 0.0);
+  EXPECT_EQ(info1->bounds.right(), actor->GetBounds().x);
+  DragResizeHandle(2);
+  EXPECT_GT(actor->GetOpacity(), 0.0);
+  EXPECT_EQ(info1->bounds.right(), actor->GetBounds().x);
+}
+
 TEST_F(LayoutManager2Test, SetLayoutMode) {
   // We should start out in maximized mode.
   EXPECT_TRUE(layout_manager()->maximized());

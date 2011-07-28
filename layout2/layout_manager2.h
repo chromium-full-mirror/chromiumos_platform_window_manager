@@ -76,11 +76,11 @@ class LayoutManager2 : public EventConsumer,
   virtual void HandlePointerEnter(XWindow xid,
                                   const Point& relative_pos,
                                   const Point& absolute_pos,
-                                  XTime timestamp) {}
+                                  XTime timestamp);
   virtual void HandlePointerLeave(XWindow xid,
                                   const Point& relative_pos,
                                   const Point& absolute_pos,
-                                  XTime timestamp) {}
+                                  XTime timestamp);
   virtual void HandlePointerMotion(XWindow xid,
                                    const Point& relative_pos,
                                    const Point& absolute_pos,
@@ -117,6 +117,7 @@ class LayoutManager2 : public EventConsumer,
   FRIEND_TEST(LayoutManager2Test, MultipleWindowLayout);
   FRIEND_TEST(LayoutManager2Test, ClickToActivateBrowser);
   FRIEND_TEST(LayoutManager2Test, AvoidJankOnLayoutModeChange);
+  FRIEND_TEST(LayoutManager2Test, ResizeHandleActor);
 
   // Specifies ArrangeBrowserWindows()'s behavior with regard to assigning the
   // input focus.
@@ -344,6 +345,10 @@ class LayoutManager2 : public EventConsumer,
 
   // Input window that can be dragged to resize the active browser window.
   XWindow resize_handle_xid_;
+
+  // Actor used to emphasize the resize handle while the pointer is over it.
+  scoped_ptr<Compositor::ColoredBoxActor> resize_handle_actor_;
+  bool resize_handle_actor_is_visible_;
 
   // Left and right resize cursors used by |resize_handle_xid_|.
   XID left_cursor_;
