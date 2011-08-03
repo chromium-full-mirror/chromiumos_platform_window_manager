@@ -88,7 +88,7 @@ PanelBar::PanelBar(PanelManager* panel_manager)
       show_collapsed_panels_input_xid_(
           wm()->CreateInputWindow(
               Rect(-1, -1, 1, 1), EnterWindowMask | LeaveWindowMask)),
-      show_collapsed_panels_timeout_id_(-1),
+      show_collapsed_panels_timeout_id_(EventLoop::kUnsetTimeoutId),
       event_consumer_registrar_(
           new EventConsumerRegistrar(wm(), panel_manager)) {
   event_consumer_registrar_->RegisterForWindowEvents(anchor_input_xid_);
@@ -317,7 +317,8 @@ void PanelBar::HandleInputWindowPointerEnter(XWindow xid,
       if (collapsed_panel_state_ != COLLAPSED_PANEL_STATE_SHOWN &&
           collapsed_panel_state_ != COLLAPSED_PANEL_STATE_WAITING_TO_SHOW) {
         collapsed_panel_state_ = COLLAPSED_PANEL_STATE_WAITING_TO_SHOW;
-        DCHECK_EQ(show_collapsed_panels_timeout_id_, -1);
+        DCHECK_EQ(show_collapsed_panels_timeout_id_,
+                  EventLoop::kUnsetTimeoutId);
         show_collapsed_panels_timeout_id_ =
             wm()->event_loop()->AddTimeout(
                 NewPermanentCallback(
@@ -1015,10 +1016,7 @@ void PanelBar::HideCollapsedPanels() {
 }
 
 void PanelBar::DisableShowCollapsedPanelsTimeout() {
-  if (show_collapsed_panels_timeout_id_ >= 0) {
-    wm()->event_loop()->RemoveTimeout(show_collapsed_panels_timeout_id_);
-    show_collapsed_panels_timeout_id_ = -1;
-  }
+  wm()->event_loop()->RemoveTimeoutIfSet(&show_collapsed_panels_timeout_id_);
 }
 
 void PanelBar::HandleShowCollapsedPanelsTimeout() {

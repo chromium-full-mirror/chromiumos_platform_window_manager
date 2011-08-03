@@ -45,8 +45,6 @@ static const int kLoggedInTransitionAnimMs = 100;
 // want a big number that we'll never see for a valid selection.
 static const size_t kNoSelection = static_cast<size_t>(-1);
 
-static const int kNoTimer = -1;
-
 // Action names for navigating across user windows.
 static const char kSelectLeftAction[] = "login-select-left";
 static const char kSelectRightAction[] = "login-select-right";
@@ -63,7 +61,7 @@ static const char kSelectRightAction[] = "login-select-right";
 LoginController::SelectionChangedManager::SelectionChangedManager(
     LoginController* layout)
     : layout_(layout),
-      timeout_id_(kNoTimer),
+      timeout_id_(EventLoop::kUnsetTimeoutId),
       selected_index_(kNoSelection) {
 }
 
@@ -72,7 +70,7 @@ LoginController::SelectionChangedManager::~SelectionChangedManager() {
 }
 
 void LoginController::SelectionChangedManager::Schedule(size_t selected_index) {
-  if (timeout_id_ != kNoTimer)
+  if (timeout_id_ != EventLoop::kUnsetTimeoutId)
     Run();
 
   selected_index_ = selected_index;
@@ -86,10 +84,7 @@ void LoginController::SelectionChangedManager::Schedule(size_t selected_index) {
 }
 
 void LoginController::SelectionChangedManager::Stop() {
-  if (timeout_id_ != kNoTimer) {
-    layout_->wm_->event_loop()->RemoveTimeout(timeout_id_);
-    timeout_id_ = kNoTimer;
-  }
+  layout_->wm_->event_loop()->RemoveTimeoutIfSet(&timeout_id_);
 }
 
 void LoginController::SelectionChangedManager::Run() {
@@ -112,7 +107,8 @@ LoginController::LoginController(WindowManager* wm)
       requested_destruction_(false),
       is_entry_selection_enabled_(true),
       last_inserted_entry_(kNoSelection),
-      hide_mouse_cursor_xid_(0) {
+      hide_mouse_cursor_xid_(0),
+      drop_startup_background_timeout_id_(EventLoop::kUnsetTimeoutId) {
   registrar_.RegisterForChromeMessages(
       chromeos::WM_IPC_MESSAGE_WM_SET_LOGIN_STATE);
   registrar_.RegisterForChromeMessages(
@@ -135,6 +131,7 @@ LoginController::LoginController(WindowManager* wm)
 }
 
 LoginController::~LoginController() {
+  wm_->event_loop()->RemoveTimeoutIfSet(&drop_startup_background_timeout_id_);
   if (hide_mouse_cursor_xid_)
     ShowMouseCursor();
 }
@@ -667,8 +664,10 @@ void LoginController::ConfigureBackgroundWindow() {
   // way in -- we don't want the initial contents to be visible again if
   // Chrome goes away because the user initiated shutdown from the login
   // screen.
-  wm_->event_loop()->AddTimeout(
-      NewPermanentCallback(wm_, &WindowManager::DropStartupBackground),
+  wm_->event_loop()->RemoveTimeoutIfSet(&drop_startup_background_timeout_id_);
+  drop_startup_background_timeout_id_ = wm_->event_loop()->AddTimeout(
+      NewPermanentCallback(
+          this, &LoginController::HandleDropStartupBackgroundTimeout),
       kInitialShowAnimationTimeInMs, 0);
 }
 
@@ -1021,6 +1020,11 @@ void LoginController::NotifySessionManager() {
                           login_manager::kSessionManagerServicePath,
                           login_manager::kSessionManagerInterface,
                           login_manager::kSessionManagerEmitLoginPromptVisible);
+}
+
+void LoginController::HandleDropStartupBackgroundTimeout() {
+  wm_->DropStartupBackground();
+  wm_->event_loop()->RemoveTimeoutIfSet(&drop_startup_background_timeout_id_);
 }
 
 }  // namespace window_manager

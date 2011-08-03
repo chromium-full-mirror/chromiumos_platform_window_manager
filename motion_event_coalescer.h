@@ -7,6 +7,7 @@
 
 #include "base/memory/scoped_ptr.h"
 #include "window_manager/callback.h"
+#include "window_manager/event_loop.h"
 #include "window_manager/geometry.h"
 
 namespace window_manager {
@@ -36,7 +37,7 @@ class MotionEventCoalescer {
 
   // Is the timer currently running?
   bool IsRunning() {
-    return timeout_id_ >= 0;
+    return timeout_id_ != EventLoop::kUnsetTimeoutId;
   }
 
   // Store a position.  This should be called in response to each motion
@@ -57,7 +58,7 @@ class MotionEventCoalescer {
 
   EventLoop* event_loop_;  // not owned
 
-  // Timeout ID, or -1 if the timeout isn't active.
+  // Timeout ID, or EventLoop::kUnsetTimeoutId if the timeout isn't active.
   int timeout_id_;
 
   // Frequency for invoking the callback, in milliseconds.

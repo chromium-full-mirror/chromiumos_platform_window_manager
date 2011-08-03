@@ -164,7 +164,7 @@ class ScreenLockerHandler : public EventConsumer {
   // window (if the screen is locked).
   void DestroySnapshotAndUpdateVisibilityGroup();
 
-  // Reset |destroy_snapshot_timeout_id_| to -1 and call
+  // Reset |destroy_snapshot_timeout_id_| to EventLoop::kUnsetTimeoutId and call
   // DestroySnapshotAndUpdateVisibilityGroup().
   void HandleDestroySnapshotTimeout();
 

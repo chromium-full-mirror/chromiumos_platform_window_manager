@@ -25,9 +25,11 @@ using std::vector;
 
 namespace window_manager {
 
-static void FillTimerSpec(struct itimerspec* spec,
-                          int64_t initial_timeout_ms,
-                          int64_t recurring_timeout_ms) {
+namespace {
+
+void FillTimerSpec(struct itimerspec* spec,
+                   int64_t initial_timeout_ms,
+                   int64_t recurring_timeout_ms) {
   DCHECK(spec);
   memset(spec, 0, sizeof(*spec));
   spec->it_value.tv_sec = initial_timeout_ms / 1000;
@@ -39,6 +41,11 @@ static void FillTimerSpec(struct itimerspec* spec,
   spec->it_interval.tv_sec = recurring_timeout_ms / 1000;
   spec->it_interval.tv_nsec = (recurring_timeout_ms % 1000) * 1000000;
 }
+
+}  // namespace
+
+// static
+const int EventLoop::kUnsetTimeoutId = -1;
 
 EventLoop::EventLoop()
     : exit_requested_(false),
@@ -55,6 +62,8 @@ EventLoop::EventLoop()
 
 EventLoop::~EventLoop() {
   close(epoll_fd_);
+  DCHECK(timeout_fds_.empty())
+      << "Leaking " << timeout_fds_.size() << " timer FD(s)";
   for (set<int>::iterator it = timeout_fds_.begin();
        it != timeout_fds_.end(); ++it) {
     PCHECK(HANDLE_EINTR(close(*it)) == 0);
@@ -184,6 +193,13 @@ void EventLoop::RemoveTimeout(int id) {
   PCHECK(HANDLE_EINTR(close(id)) == 0);
 }
 
+void EventLoop::RemoveTimeoutIfSet(int* id) {
+  if (*id >= 0) {
+    RemoveTimeout(*id);
+    *id = kUnsetTimeoutId;
+  }
+}
+
 void EventLoop::PostTask(Closure* cb) {
   DCHECK(cb);
   posted_tasks_.push_back(shared_ptr<Closure>(cb));
@@ -229,7 +245,9 @@ void EventLoop::RunTimeoutForTesting(int id) {
   CHECK(timeout_fds_.count(id)) << "Timeout " << id << " not registered";
   FdCallbackMap::iterator it = callbacks_.find(id);
   CHECK(it != callbacks_.end());
-  it->second->Run();
+  // Add a reference to the callback in case it unregisters itself.
+  shared_ptr<Closure> callback = it->second;
+  callback->Run();
 }
 
 void EventLoop::RunAllPostedTasks() {

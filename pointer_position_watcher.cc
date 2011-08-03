@@ -23,7 +23,7 @@ PointerPositionWatcher::PointerPositionWatcher(
       cb_(cb),
       watch_for_entering_target_(watch_for_entering_target),
       target_bounds_(target_bounds),
-      timeout_id_(-1) {
+      timeout_id_(EventLoop::kUnsetTimeoutId) {
   DCHECK(event_loop);
   DCHECK(xconn);
   DCHECK(cb);
@@ -42,10 +42,7 @@ void PointerPositionWatcher::TriggerTimeout() {
 }
 
 void PointerPositionWatcher::CancelTimeoutIfActive() {
-  if (timeout_id_ >= 0) {
-    event_loop_->RemoveTimeout(timeout_id_);
-    timeout_id_ = -1;
-  }
+  event_loop_->RemoveTimeoutIfSet(&timeout_id_);
 }
 
 void PointerPositionWatcher::HandleTimeout() {

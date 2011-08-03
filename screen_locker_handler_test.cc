@@ -206,7 +206,7 @@ TEST_F(ScreenLockerHandlerTest, AbortedLock) {
   MockCompositor::TexturePixmapActor* actor = GetSnapshotActor();
   ASSERT_TRUE(actor != NULL);
   TestActorConfiguredForSlowClose(actor);
-  EXPECT_NE(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
 
   // The snapshot should be the only actor currently visible.
   EXPECT_EQ(static_cast<size_t>(2), actor->visibility_groups().size());
@@ -230,13 +230,13 @@ TEST_F(ScreenLockerHandlerTest, AbortedLock) {
   // Check that a timeout was registered to destroy the snapshot, and then
   // invoke the callback and check that the actor was destroyed and we're
   // displaying all actors again.
-  ASSERT_NE(-1, handler_->destroy_snapshot_timeout_id_);
+  ASSERT_NE(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   if (!EventLoop::IsTimerFdSupported()) {
     LOG(ERROR) << "Aborting test because of missing timerfd support";
     return;
   }
   event_loop_->RunTimeoutForTesting(handler_->destroy_snapshot_timeout_id_);
-  EXPECT_EQ(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   EXPECT_EQ(static_cast<size_t>(0),
             compositor_->active_visibility_groups().size());
 }
@@ -263,13 +263,13 @@ TEST_F(ScreenLockerHandlerTest, SuccessfulLock) {
 
   // Invoke the timeout to destroy it and check that we're showing only the
   // screen locker window.
-  ASSERT_NE(-1, handler_->destroy_snapshot_timeout_id_);
+  ASSERT_NE(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   if (!EventLoop::IsTimerFdSupported()) {
     LOG(ERROR) << "Aborting test because of missing timerfd support";
     return;
   }
   event_loop_->RunTimeoutForTesting(handler_->destroy_snapshot_timeout_id_);
-  EXPECT_EQ(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   EXPECT_TRUE(GetSnapshotActor() == NULL);
   EXPECT_TRUE(IsOnlyActiveVisibilityGroup(
                   WindowManager::VISIBILITY_GROUP_SCREEN_LOCKER));
@@ -286,7 +286,7 @@ TEST_F(ScreenLockerHandlerTest, AbortedShutdown) {
   MockCompositor::TexturePixmapActor* actor = GetSnapshotActor();
   ASSERT_TRUE(actor != NULL);
   TestActorConfiguredForSlowClose(actor);
-  EXPECT_NE(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
 
   // The snapshot should be the only actor currently visible.
   EXPECT_TRUE(actor->visibility_groups().count(
@@ -307,13 +307,13 @@ TEST_F(ScreenLockerHandlerTest, AbortedShutdown) {
   // Check that a timeout was registered to destroy the snapshot, and then
   // invoke the callback and check that the actor was destroyed and we're
   // displaying all actors again.
-  ASSERT_NE(-1, handler_->destroy_snapshot_timeout_id_);
+  ASSERT_NE(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   if (!EventLoop::IsTimerFdSupported()) {
     LOG(ERROR) << "Aborting test because of missing timerfd support";
     return;
   }
   event_loop_->RunTimeoutForTesting(handler_->destroy_snapshot_timeout_id_);
-  EXPECT_EQ(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   EXPECT_EQ(static_cast<size_t>(0),
             compositor_->active_visibility_groups().size());
 
@@ -338,9 +338,9 @@ TEST_F(ScreenLockerHandlerTest, AbortedShutdown) {
   // After aborting, we should be showing just the screen locker window.
   msg.set_param(0, chromeos::WM_IPC_POWER_BUTTON_ABORTED_SHUTDOWN);
   SendWmIpcMessage(msg);
-  ASSERT_NE(-1, handler_->destroy_snapshot_timeout_id_);
+  ASSERT_NE(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   event_loop_->RunTimeoutForTesting(handler_->destroy_snapshot_timeout_id_);
-  EXPECT_EQ(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   EXPECT_TRUE(IsOnlyActiveVisibilityGroup(
                   WindowManager::VISIBILITY_GROUP_SCREEN_LOCKER));
 }
@@ -357,7 +357,7 @@ TEST_F(ScreenLockerHandlerTest, HandleShutdown) {
   MockCompositor::TexturePixmapActor* actor = GetSnapshotActor();
   ASSERT_TRUE(actor != NULL);
   TestActorConfiguredForSlowClose(actor);
-  EXPECT_NE(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
   EXPECT_TRUE(IsOnlyActiveVisibilityGroup(
                   WindowManager::VISIBILITY_GROUP_SESSION_ENDING));
 
@@ -383,7 +383,7 @@ TEST_F(ScreenLockerHandlerTest, HandleShutdown) {
 
   // There's no need to destroy the snapshot after we're done with the
   // animation; we're not going to be showing anything else onscreen.
-  EXPECT_EQ(-1, handler_->destroy_snapshot_timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, handler_->destroy_snapshot_timeout_id_);
 }
 
 // Test that we repeatedly try to grab the pointer and keyboard when the
@@ -403,20 +403,20 @@ TEST_F(ScreenLockerHandlerTest, InputsAlreadyGrabbed) {
   // Now pretend that the pointer grab was released and check that after the
   // timeout fires, the WM installs a pointer grab.
   xconn_->set_pointer_grab_xid(0);
-  EXPECT_NE(-1, handler_->grab_inputs_timeout_id_);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, handler_->grab_inputs_timeout_id_);
   event_loop_->RunTimeoutForTesting(handler_->grab_inputs_timeout_id_);
   EXPECT_EQ(xconn_->GetRootWindow(), xconn_->pointer_grab_xid());
   EXPECT_EQ(other_xid, xconn_->keyboard_grab_xid());
 
   // Do the same thing with the keyboard.
   xconn_->set_keyboard_grab_xid(0);
-  EXPECT_NE(-1, handler_->grab_inputs_timeout_id_);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, handler_->grab_inputs_timeout_id_);
   event_loop_->RunTimeoutForTesting(handler_->grab_inputs_timeout_id_);
   EXPECT_EQ(xconn_->GetRootWindow(), xconn_->pointer_grab_xid());
   EXPECT_EQ(xconn_->GetRootWindow(), xconn_->keyboard_grab_xid());
 
   // Both inputs are grabbed, so the timeout should be unregistered now.
-  EXPECT_EQ(-1, handler_->grab_inputs_timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, handler_->grab_inputs_timeout_id_);
 }
 
 // Test that we don't consider the screen to be locked until the screen

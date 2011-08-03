@@ -64,10 +64,10 @@ ScreenLockerHandler::ScreenLockerHandler(WindowManager* wm)
     : wm_(wm),
       registrar_(new EventConsumerRegistrar(wm_, this)),
       snapshot_pixmap_(0),
-      destroy_snapshot_timeout_id_(-1),
+      destroy_snapshot_timeout_id_(EventLoop::kUnsetTimeoutId),
       is_locked_(false),
       session_ending_(false),
-      grab_inputs_timeout_id_(-1),
+      grab_inputs_timeout_id_(EventLoop::kUnsetTimeoutId),
       pointer_grabbed_(false),
       keyboard_grabbed_(false),
       transparent_cursor_(0) {
@@ -499,7 +499,7 @@ void ScreenLockerHandler::DestroySnapshotAndUpdateVisibilityGroup() {
 }
 
 void ScreenLockerHandler::HandleDestroySnapshotTimeout() {
-  destroy_snapshot_timeout_id_ = -1;
+  wm_->event_loop()->RemoveTimeoutIfSet(&destroy_snapshot_timeout_id_);
   DestroySnapshotAndUpdateVisibilityGroup();
 }
 

@@ -23,6 +23,9 @@ class EventLoop {
   EventLoop();
   ~EventLoop();
 
+  // Value that can be used for unset timeout IDs.
+  static const int kUnsetTimeoutId;
+
   // Get the number of current-registered timeouts.  Used for testing.
   int num_timeouts() const { return timeout_fds_.size(); }
 
@@ -71,13 +74,8 @@ class EventLoop {
   void RemoveTimeout(int id);
 
   // If the variable pointed at by |id| contains a timeout, remove the timeout
-  // and set the variable to -1.
-  void RemoveTimeoutIfSet(int* id) {
-    if (*id >= 0) {
-      RemoveTimeout(*id);
-      *id = -1;
-    }
-  }
+  // and set the variable to |kUnsetTimeoutId|.
+  void RemoveTimeoutIfSet(int* id);
 
   // Run |cb| once immediately after control is returned to the event loop.
   //

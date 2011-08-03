@@ -31,7 +31,7 @@ class TestEventLoopSubscriber {
   TestEventLoopSubscriber(EventLoop* event_loop, MockXConnection* xconn)
       : event_loop_(event_loop),
         xconn_(xconn),
-        timeout_id_(-1),
+        timeout_id_(EventLoop::kUnsetTimeoutId),
         num_times_timeout_invoked_(0) {
   }
 
@@ -90,12 +90,13 @@ class TestEventLoopSubscriber {
 struct RemoveScheduledTimeoutData {
   RemoveScheduledTimeoutData(EventLoop* event_loop)
       : event_loop(event_loop),
-        timeout_id_to_remove(0),
+        timeout_id_to_remove(EventLoop::kUnsetTimeoutId),
         called(false) {
   }
 
   void RemoveTimeout() {
     event_loop->RemoveTimeout(timeout_id_to_remove);
+    timeout_id_to_remove = EventLoop::kUnsetTimeoutId;
     called = true;
     event_loop->Exit();
   }
@@ -113,10 +114,15 @@ struct PostTaskData {
         timeout_called(false) {
     event_loop->AddPrePollCallback(
         NewPermanentCallback(this, &PostTaskData::HandlePrePollCallback));
-    event_loop->AddTimeout(
+    first_timeout_id = event_loop->AddTimeout(
         NewPermanentCallback(this, &PostTaskData::HandleTimeout), 0, 0);
-    event_loop->AddTimeout(
+    second_timeout_id = event_loop->AddTimeout(
         NewPermanentCallback(this, &PostTaskData::HandleTimeout), 0, 0);
+  }
+
+  ~PostTaskData() {
+    event_loop->RemoveTimeout(first_timeout_id);
+    event_loop->RemoveTimeout(second_timeout_id);
   }
 
   // These values represent the various Handle*() methods defined below.
@@ -178,6 +184,10 @@ struct PostTaskData {
   // Have HandlePrePollCallback() and HandleTimeout() been called yet?
   bool prepoll_called;
   bool timeout_called;
+
+  // IDs of the two timeouts that we register.
+  int first_timeout_id;
+  int second_timeout_id;
 };
 
 
@@ -230,6 +240,9 @@ TEST_F(EventLoopTest, RemoveScheduledTimeout) {
   EXPECT_TRUE(first_timeout_data.called ^ second_timeout_data.called)
       << "first=" << first_timeout_data.called
       << " second=" << second_timeout_data.called;
+
+  event_loop.RemoveTimeoutIfSet(&first_timeout_data.timeout_id_to_remove);
+  event_loop.RemoveTimeoutIfSet(&second_timeout_data.timeout_id_to_remove);
 }
 
 // Test that tasks posted via the PostTask() method always get called as

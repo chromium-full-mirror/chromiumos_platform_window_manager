@@ -44,25 +44,25 @@ TEST_F(PointerPositionWatcherTest, Basic) {
           NewPermanentCallback(&counter, &TestCallbackCounter::Increment),
           true,  // watch_for_entering_target
           Rect(50, 100, 20, 30)));
-  EXPECT_GE(watcher->timeout_id(), 0);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
 
   // Check that the callback doesn't get run and the timer stays active as
   // long as the pointer is outside of the rectangle.
   watcher->TriggerTimeout();
   EXPECT_EQ(0, counter.num_calls());
-  EXPECT_GE(watcher->timeout_id(), 0);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
 
   xconn.SetPointerPosition(Point(49, 105));
   watcher->TriggerTimeout();
   EXPECT_EQ(0, counter.num_calls());
-  EXPECT_GE(watcher->timeout_id(), 0);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
 
   // As soon as the pointer moves into the rectangle, the callback should
   // be run and the timer should be destroyed.
   xconn.SetPointerPosition(Point(50, 105));
   watcher->TriggerTimeout();
   EXPECT_EQ(1, counter.num_calls());
-  EXPECT_EQ(-1, watcher->timeout_id());
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
 
   // Now create a new watcher that waits for the pointer to move *outside*
   // of the same region.
@@ -73,22 +73,22 @@ TEST_F(PointerPositionWatcherTest, Basic) {
           NewPermanentCallback(&counter, &TestCallbackCounter::Increment),
           false,  // watch_for_entering_target=false
           Rect(50, 100, 20, 30)));
-  EXPECT_GE(watcher->timeout_id(), 0);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
   counter.Reset();
 
   watcher->TriggerTimeout();
   EXPECT_EQ(0, counter.num_calls());
-  EXPECT_GE(watcher->timeout_id(), 0);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
 
   xconn.SetPointerPosition(Point(69, 129));
   watcher->TriggerTimeout();
   EXPECT_EQ(0, counter.num_calls());
-  EXPECT_GE(watcher->timeout_id(), 0);
+  EXPECT_NE(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
 
   xconn.SetPointerPosition(Point(69, 130));
   watcher->TriggerTimeout();
   EXPECT_EQ(1, counter.num_calls());
-  EXPECT_EQ(-1, watcher->timeout_id());
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, watcher->timeout_id());
 }
 
 // Test that we don't crash if a callback deletes the watcher that ran it.

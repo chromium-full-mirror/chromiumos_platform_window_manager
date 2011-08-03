@@ -322,8 +322,8 @@ class PanelBar : public PanelContainer {
   XWindow show_collapsed_panels_input_xid_;
 
   // ID of a timeout that we use to delay calling ShowCollapsedPanels()
-  // after the pointer enters |show_collapsed_panels_input_xid_|, or -1 if
-  // unset.
+  // after the pointer enters |show_collapsed_panels_input_xid_|, or
+  // EventLoop::kUnsetTimeoutId if unset.
   int show_collapsed_panels_timeout_id_;
 
   // Used to monitor the pointer position when we're showing collapsed

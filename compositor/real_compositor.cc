@@ -740,7 +740,7 @@ RealCompositor::RealCompositor(EventLoop* event_loop,
       partially_dirty_(false),
       num_animations_(0),
       actor_count_(0),
-      draw_timeout_id_(-1),
+      draw_timeout_id_(EventLoop::kUnsetTimeoutId),
       draw_timeout_enabled_(false),
       texture_pixmap_actor_uses_fast_path_(true),
       prev_top_fullscreen_actor_(NULL),
@@ -786,10 +786,7 @@ RealCompositor::RealCompositor(EventLoop* event_loop,
 
 RealCompositor::~RealCompositor() {
   draw_visitor_.reset();
-  if (draw_timeout_id_ >= 0) {
-    event_loop_->RemoveTimeout(draw_timeout_id_);
-    draw_timeout_id_ = -1;
-  }
+  event_loop_->RemoveTimeoutIfSet(&draw_timeout_id_);
 }
 
 void RealCompositor::RegisterCompositionChangeListener(

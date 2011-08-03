@@ -51,7 +51,7 @@ ChromeWatchdog::ChromeWatchdog(WindowManager* wm)
       registrar_(new EventConsumerRegistrar(wm, this)),
       pinged_chrome_xid_(0),
       ping_timestamp_(0),
-      timeout_id_(-1),
+      timeout_id_(EventLoop::kUnsetTimeoutId),
       last_killed_pid_(-1) {
 }
 
@@ -114,7 +114,7 @@ bool ChromeWatchdog::SendPingToChrome(XTime timestamp, int timeout_ms) {
   if (!wm_->GetWindowOrDie(xid)->SendPing(timestamp))
     return false;
 
-  DCHECK_LT(timeout_id_, 0);
+  DCHECK_EQ(timeout_id_, EventLoop::kUnsetTimeoutId);
   timeout_id_ = wm_->event_loop()->AddTimeout(
       NewPermanentCallback(this, &ChromeWatchdog::HandleTimeout),
       timeout_ms, 0);
@@ -133,8 +133,7 @@ void ChromeWatchdog::AbortTimeout() {
   registrar_->UnregisterForWindowEvents(wm_->root());
   pinged_chrome_xid_ = 0;
   ping_timestamp_ = 0;
-  wm_->event_loop()->RemoveTimeout(timeout_id_);
-  timeout_id_ = -1;
+  wm_->event_loop()->RemoveTimeoutIfSet(&timeout_id_);
 }
 
 void ChromeWatchdog::HandleTimeout() {

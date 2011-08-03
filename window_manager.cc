@@ -223,14 +223,14 @@ WindowManager::WindowManager(EventLoop* event_loop,
       stacked_xids_(new Stacker<XWindow>),
       damage_debugging_enabled_(false),
       active_window_xid_(0),
-      query_keyboard_state_timeout_id_(-1),
+      query_keyboard_state_timeout_id_(EventLoop::kUnsetTimeoutId),
       unredirected_fullscreen_xid_(0),
       disable_compositing_task_is_pending_(false),
       wm_ipc_version_(1),
       logged_in_(false),
       initialize_logging_(false),
-      hide_unaccelerated_graphics_actor_timeout_id_(-1),
-      chrome_watchdog_timeout_id_(-1),
+      hide_unaccelerated_graphics_actor_timeout_id_(EventLoop::kUnsetTimeoutId),
+      chrome_watchdog_timeout_id_(EventLoop::kUnsetTimeoutId),
       num_compositing_requests_(0) {
   CHECK(event_loop_);
   CHECK(xconn_);
@@ -2040,8 +2040,8 @@ void WindowManager::HideUnacceleratedGraphicsActor() {
   if (unaccelerated_graphics_actor_.get())
     unaccelerated_graphics_actor_->SetOpacity(
         0.f, kUnacceleratedGraphicsActorHideAnimMs );
-  event_loop_->RemoveTimeout(hide_unaccelerated_graphics_actor_timeout_id_);
-  hide_unaccelerated_graphics_actor_timeout_id_ = 0;
+  event_loop_->RemoveTimeoutIfSet(
+      &hide_unaccelerated_graphics_actor_timeout_id_);
 }
 
 void WindowManager::DisableCompositing() {

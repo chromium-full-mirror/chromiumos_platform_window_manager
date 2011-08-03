@@ -122,7 +122,7 @@ TEST_F(ChromeWatchdogTest, Basic) {
                                  kPingAtom, kTimestamp, toplevel_xid, 0, 0);
   wm_->HandleEvent(&event);
   EXPECT_FALSE(watchdog->has_outstanding_ping());
-  EXPECT_EQ(-1, watchdog->timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, watchdog->timeout_id_);
   EXPECT_EQ(-1, watchdog->last_killed_pid_);
   EXPECT_EQ(kInitialNumTimeouts, event_loop_->num_timeouts());
 
@@ -132,7 +132,7 @@ TEST_F(ChromeWatchdogTest, Basic) {
   EXPECT_TRUE(watchdog->SendPingToChrome(kTimestamp, kTimeoutMs));
   watchdog->HandleTimeout();
   EXPECT_FALSE(watchdog->has_outstanding_ping());
-  EXPECT_EQ(-1, watchdog->timeout_id_);
+  EXPECT_EQ(EventLoop::kUnsetTimeoutId, watchdog->timeout_id_);
   EXPECT_EQ(kPid, watchdog->last_killed_pid_);
   EXPECT_EQ(kInitialNumTimeouts, event_loop_->num_timeouts());
 }

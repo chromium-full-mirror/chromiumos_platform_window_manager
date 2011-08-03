@@ -113,8 +113,8 @@ class ChromeWatchdog : public EventConsumer {
   // Time at which we sent the last ping (used for metrics).
   base::TimeTicks monotonic_time_from_last_ping_;
 
-  // ID of the timeout that will run HandleTimeout(), or -1 if no timeout
-  // is currently registered.
+  // ID of the timeout that will run HandleTimeout(), or
+  // EventLoop::kUnsetTimeoutId if no timeout is currently registered.
   int timeout_id_;
 
   // PID of the last process that we killed, or -1 if we've never killed a

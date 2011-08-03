@@ -5,7 +5,6 @@
 #include "window_manager/motion_event_coalescer.h"
 
 #include "base/logging.h"
-#include "window_manager/event_loop.h"
 
 namespace window_manager {
 
@@ -13,7 +12,7 @@ MotionEventCoalescer::MotionEventCoalescer(EventLoop* event_loop,
                                            Closure* cb,
                                            int timeout_ms)
     : event_loop_(event_loop),
-      timeout_id_(-1),
+      timeout_id_(EventLoop::kUnsetTimeoutId),
       timeout_ms_(timeout_ms),
       have_queued_position_(false),
       position_(-1, -1),
@@ -29,7 +28,7 @@ MotionEventCoalescer::~MotionEventCoalescer() {
 }
 
 void MotionEventCoalescer::Start() {
-  if (timeout_id_ >= 0) {
+  if (timeout_id_ != EventLoop::kUnsetTimeoutId) {
     LOG(WARNING) << "Ignoring request to start coalescer while timer "
                  << "is already running";
     return;
@@ -58,13 +57,12 @@ void MotionEventCoalescer::StorePosition(const Point& pos) {
 }
 
 void MotionEventCoalescer::StopInternal(bool maybe_run_callback) {
-  if (timeout_id_ < 0) {
+  if (timeout_id_ == EventLoop::kUnsetTimeoutId) {
     LOG(WARNING) << "Ignoring request to stop coalescer while timer "
                  << "isn't running";
     return;
   }
-  event_loop_->RemoveTimeout(timeout_id_);
-  timeout_id_ = -1;
+  event_loop_->RemoveTimeoutIfSet(&timeout_id_);
 
   // Invoke the handler one last time to catch any events that came in
   // after the final run.

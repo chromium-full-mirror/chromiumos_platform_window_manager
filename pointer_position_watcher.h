@@ -69,7 +69,7 @@ class PointerPositionWatcher {
   // Target rectangle.
   Rect target_bounds_;
 
-  // Timeout ID, or -1 if the timeout isn't active.
+  // Timeout ID, or EventLoop::kUnsetTimeoutId if the timeout isn't active.
   int timeout_id_;
 };
 

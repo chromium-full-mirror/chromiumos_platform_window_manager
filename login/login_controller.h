@@ -15,6 +15,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "window_manager/event_consumer.h"
 #include "window_manager/event_consumer_registrar.h"
+#include "window_manager/event_loop.h"
 #include "window_manager/login/login_entry.h"
 
 namespace window_manager {
@@ -105,7 +106,9 @@ class LoginController : public EventConsumer {
     // Stops any pending runs.
     void Stop();
 
-    bool is_scheduled() const { return timeout_id_ != -1; }
+    bool is_scheduled() const {
+      return timeout_id_ != EventLoop::kUnsetTimeoutId;
+    }
     int selected_index() const { return selected_index_; }
 
    private:
@@ -114,7 +117,7 @@ class LoginController : public EventConsumer {
 
     LoginController* layout_;
 
-    // If not kNoTimer indicates there is a pending run.
+    // If not EventLoop::kUnsetTimeoutId, indicates there is a pending run.
     int timeout_id_;
 
     // Last index passed to Schedule.
@@ -212,6 +215,9 @@ class LoginController : public EventConsumer {
   // windows are visible.
   void NotifySessionManager();
 
+  // Invoke WindowManager::DropStartupBackground().
+  void HandleDropStartupBackgroundTimeout();
+
   WindowManager* wm_;
 
   EventConsumerRegistrar registrar_;
@@ -292,6 +298,9 @@ class LoginController : public EventConsumer {
   // Chrome browser windows that we're watching.  We wait for one of the
   // browser windows to get painted and then destroy ourselves.
   std::set<XWindow> browser_xids_;
+
+  // ID of timeout for invoking HandleDropStartupBackgroundTimeout().
+  int drop_startup_background_timeout_id_;
 
   DISALLOW_COPY_AND_ASSIGN(LoginController);
 };

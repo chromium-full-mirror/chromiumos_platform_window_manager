@@ -264,7 +264,7 @@ bool MockXConnection::GrabKeyboard(XWindow xid, XTime timestamp) {
   if (!info)
     return false;
   if (keyboard_grab_xid_ != None) {
-    LOG(ERROR) << "Keyeboard is already grabbed for "
+    LOG(ERROR) << "Keyboard is already grabbed for "
                << XidStr(keyboard_grab_xid_)
                << "; ignoring request to grab it for " << XidStr(xid);
     return false;
