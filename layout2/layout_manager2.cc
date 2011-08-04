@@ -37,8 +37,12 @@ DEFINE_string(initial_chrome_window_mapped_file,
               "Tests can watch for the file to know when the user is fully "
               "logged in.  Leave empty to disable.");
 
-DEFINE_bool(multiple_windows, true,
-            "Support displaying multiple windows onscreen at once");
+DEFINE_bool(overlapping_windows, true,
+            "Permit displaying multiple, overlapping browser windows onscreen");
+
+DEFINE_bool(overlap_windows_by_default, true,
+            "Automatically switch to the overlapping layout mode when a "
+            "second browser window is opened");
 
 DEFINE_string(xterm_command, "xterm", "Command to launch a terminal");
 
@@ -209,8 +213,10 @@ bool LayoutManager2::HandleWindowMapRequest(Window* win) {
     win->SetVisibility(Window::VISIBILITY_HIDDEN);
     win->Move(Point(workarea_.right(), workarea_.top()), 0);
 
+    const bool switch_to_overlapping =
+        FLAGS_overlap_windows_by_default && num_browser_windows() == 1;
     const bool maximize =
-        !FLAGS_multiple_windows || (maximized() && num_browser_windows() != 1);
+        !FLAGS_overlapping_windows || (maximized() && !switch_to_overlapping);
     Size initial_size = workarea_.size();
     if (win->wm_state_fullscreen())
       initial_size = wm_->root_bounds().size();
@@ -610,7 +616,7 @@ void LayoutManager2::InitKeyBindings() {
   key_bindings_group_->AddBinding(
       KeyBindings::KeyCombo(XK_Tab, KeyBindings::kAltMask),
       kCycleForwardAction);
-  if (!FLAGS_multiple_windows) {
+  if (!FLAGS_overlapping_windows) {
     key_bindings_group_->AddBinding(
         KeyBindings::KeyCombo(XK_F5, 0),
         kCycleForwardAction);
@@ -625,7 +631,7 @@ void LayoutManager2::InitKeyBindings() {
       KeyBindings::KeyCombo(
           XK_Tab, KeyBindings::kAltMask | KeyBindings::kShiftMask),
       kCycleBackwardAction);
-  if (!FLAGS_multiple_windows) {
+  if (!FLAGS_overlapping_windows) {
     key_bindings_group_->AddBinding(
         KeyBindings::KeyCombo(XK_F5, KeyBindings::kShiftMask),
         kCycleBackwardAction);
@@ -653,7 +659,7 @@ void LayoutManager2::InitKeyBindings() {
       KeyBindings::KeyCombo(XK_9, KeyBindings::kAltMask),
       kActivateLastBrowserAction);
 
-  if (FLAGS_multiple_windows) {
+  if (FLAGS_overlapping_windows) {
     key_bindings_actions_->AddAction(
         kToggleMaximizedAction,
         NewPermanentCallback(this, &LayoutManager2::ToggleMaximized),
@@ -720,7 +726,8 @@ void LayoutManager2::HandleBrowserWindowMap(Window* win) {
     browser_windows_.push_back(browser);
   }
 
-  if (FLAGS_multiple_windows && maximized() && num_browser_windows() == 2)
+  if (FLAGS_overlapping_windows && FLAGS_overlap_windows_by_default &&
+      maximized() && num_browser_windows() == 2)
     SetLayoutMode(WM_IPC_LAYOUT_OVERLAPPING, false);
 
   if (win->wm_state_fullscreen())
