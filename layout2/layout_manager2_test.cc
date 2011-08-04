@@ -28,7 +28,8 @@ DEFINE_bool(logtostderr, false,
 
 // Flags from layout/layout_manager2.cc:
 DECLARE_string(initial_chrome_window_mapped_file);
-DECLARE_bool(multiple_windows);
+DECLARE_bool(overlapping_windows);
+DECLARE_bool(overlap_windows_by_default);
 
 using std::set;
 using std::string;
@@ -158,8 +159,8 @@ class LayoutManager2Test : public BasicWindowManagerTest {
 
 // Test that we set windows' horizontally- and vertically-maximized state.
 TEST_F(LayoutManager2Test, LegacyMaximized) {
-  AutoReset<bool> multiple_windows_flag_resetter(
-      &FLAGS_multiple_windows, false);
+  AutoReset<bool> overlapping_windows_flag_resetter(
+      &FLAGS_overlapping_windows, false);
   CreateAndInitNewWm();
 
   const XAtom kWmStateAtom = xconn_->GetAtomOrDie("_NET_WM_STATE");
@@ -181,8 +182,8 @@ TEST_F(LayoutManager2Test, LegacyMaximized) {
 // Test the window-switching logic when windows are mapped and unmapped and when
 // the Alt-Tab and Alt-Shift-Tab shortcuts are used.
 TEST_F(LayoutManager2Test, LegacyWindowSwitching) {
-  AutoReset<bool> multiple_windows_flag_resetter(
-      &FLAGS_multiple_windows, false);
+  AutoReset<bool> overlapping_windows_flag_resetter(
+      &FLAGS_overlapping_windows, false);
   CreateAndInitNewWm();
 
   const Rect kRootBounds = xconn_->root_bounds();
@@ -277,8 +278,8 @@ TEST_F(LayoutManager2Test, LegacyWindowSwitching) {
 }
 
 TEST_F(LayoutManager2Test, LegacyTransients) {
-  AutoReset<bool> multiple_windows_flag_resetter(
-      &FLAGS_multiple_windows, false);
+  AutoReset<bool> overlapping_windows_flag_resetter(
+      &FLAGS_overlapping_windows, false);
   CreateAndInitNewWm();
 
   const XAtom kWmStateAtom = xconn_->GetAtomOrDie("_NET_WM_STATE");
@@ -474,8 +475,8 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
 }
 
 TEST_F(LayoutManager2Test, LegacyFullscreen) {
-  AutoReset<bool> multiple_windows_flag_resetter(
-      &FLAGS_multiple_windows, false);
+  AutoReset<bool> overlapping_windows_flag_resetter(
+      &FLAGS_overlapping_windows, false);
   CreateAndInitNewWm();
 
   const XAtom kWmStateAtom = xconn_->GetAtomOrDie("_NET_WM_STATE");
@@ -614,8 +615,8 @@ TEST_F(LayoutManager2Test, ResizeScreen) {
 }
 
 TEST_F(LayoutManager2Test, LegacyStackShadowsAtBottomOfLayer) {
-  AutoReset<bool> multiple_windows_flag_resetter(
-      &FLAGS_multiple_windows, false);
+  AutoReset<bool> overlapping_windows_flag_resetter(
+      &FLAGS_overlapping_windows, false);
   CreateAndInitNewWm();
 
   // Map two windows.  The second should be focused.
@@ -669,8 +670,8 @@ TEST_F(LayoutManager2Test, InitialBrowserWindow) {
 
   AutoReset<string> file_flag_resetter(
       &FLAGS_initial_chrome_window_mapped_file, initial_file_path.value());
-  AutoReset<bool> multiple_windows_flag_resetter(
-      &FLAGS_multiple_windows, false);
+  AutoReset<bool> overlapping_windows_flag_resetter(
+      &FLAGS_overlapping_windows, false);
   CreateAndInitNewWm();
 
   EXPECT_FALSE(file_util::PathExists(initial_file_path));
@@ -1410,6 +1411,27 @@ TEST_F(LayoutManager2Test, SwitchWindowHotkeys) {
           KeyBindings::KeyCombo(XK_9, KeyBindings::kAltMask),
           kEventTime, kEventTime);
   EXPECT_EQ(windows[kNumWindows-1], xconn_->focused_xid());
+}
+
+// Test that --overlap_windows_by_default=false is honored.
+TEST_F(LayoutManager2Test, DontOverlapWindowsByDefault) {
+  AutoReset<bool> overlap_windows_by_default_flag_resetter(
+      &FLAGS_overlap_windows_by_default, false);
+  CreateAndInitNewWm();
+
+  // Check that we're still in maximized mode after mapping two windows.
+  XWindow xid1 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid1);
+  XWindow xid2 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid2);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_MAXIMIZED, layout_manager()->layout_mode());
+
+  // We should still be able to switch to overlapping with F5.
+  const KeyBindings::KeyCombo kF5KeyCombo(XK_F5, 0);
+  const XTime kEventTime = wm_->GetCurrentTimeFromServer();
+  SendKey(xconn_->GetRootWindow(), kF5KeyCombo, kEventTime, kEventTime);
+  EXPECT_EQ(chromeos::WM_IPC_LAYOUT_OVERLAPPING,
+            layout_manager()->layout_mode());
 }
 
 }  // namespace window_manager
