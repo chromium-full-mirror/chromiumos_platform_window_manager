@@ -79,6 +79,9 @@ class Compositor {
     virtual void SetMoveAnimation(AnimationPair* animations) = 0;
 
     virtual void Scale(double scale_x, double scale_y, int anim_ms) = 0;
+    virtual AnimationPair* CreateScaleAnimation() = 0;
+    virtual void SetScaleAnimation(AnimationPair* animations) = 0;
+
     virtual void SetOpacity(double opacity, int anim_ms) = 0;
     virtual void Show() = 0;
     virtual void Hide() = 0;
@@ -274,9 +277,10 @@ class Compositor {
 class CompositionChangeListener {
  public:
   // This method is called whenever the compositor notices a change in the
-  // topmost visible fullscreen actor or a transition from having a fullscreen
-  // actor on top to not having one (in which case top_fullscreen_actor is
-  // NULL).  This is only called for TexturePixmapActor.
+  // topmost visible, unscaled, fullscreen actor or a transition from having a
+  // unscaled, fullscreen actor on top to not having one (in which case
+  // |top_fullscreen_actor| is NULL).  This is only called for
+  // TexturePixmapActor.
   virtual void HandleTopFullscreenActorChange(
       const Compositor::TexturePixmapActor* top_fullscreen_actor) = 0;
 

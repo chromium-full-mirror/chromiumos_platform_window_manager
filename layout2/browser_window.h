@@ -97,6 +97,11 @@ class BrowserWindow {
   // Used when the user tries to cycle windows while only one window is present.
   void DoNudgeAnimation(bool move_to_left);
 
+  // Display an animation where the window squishes down slightly before
+  // rebounding to its original size.  Used when the user tries to switch to
+  // overlapping-windows mode when only one window is present.
+  void DoSquishAnimation();
+
   // Set a window's brightness.  |brightness|'s range is [0.0, 1.0].  At 1, the
   // window is displayed unmodified; at 0, it's completely black.
   void SetBrightness(double brightness, int anim_ms);

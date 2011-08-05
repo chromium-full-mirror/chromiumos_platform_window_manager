@@ -1176,11 +1176,14 @@ void LayoutManager2::ActivateBrowserWindowByIndex(int browser_index) {
 }
 
 void LayoutManager2::ToggleMaximized() {
+  if (num_browser_windows() == 1) {
+    BrowserWindow* active_browser = GetActiveBrowserWindow();
+    active_browser->DoSquishAnimation();
+    return;
+  }
+
   SetLayoutMode(
-      maximized() && num_browser_windows() >= 2 ?
-        WM_IPC_LAYOUT_OVERLAPPING :
-        WM_IPC_LAYOUT_MAXIMIZED,
-      true);
+      maximized() ? WM_IPC_LAYOUT_OVERLAPPING : WM_IPC_LAYOUT_MAXIMIZED, true);
 }
 
 void LayoutManager2::SetLayoutMode(WmIpcLayoutMode mode,

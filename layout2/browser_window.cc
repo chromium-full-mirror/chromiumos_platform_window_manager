@@ -33,6 +33,15 @@ const int kNudgeAnimPixels = 25;
 // Amount of time used for the no-op window-switching animation.
 const int kNudgeAnimMs = 180;
 
+// Scale of the browser window in the first and second keyframe of the no-op
+// "squish" animation displayed when the user attempts to toggle to overlapping
+// mode while there's only a single browser window open.
+const double kSquishAnimShrinkScale = 0.975;
+const double kSquishAnimReboundScale = 1.0125;
+
+// Total amount of time used for the no-op "squish" animation.
+const int kSquishAnimMs = 300;
+
 }  // anonymous namespace
 
 namespace window_manager {
@@ -188,6 +197,27 @@ void BrowserWindow::DoNudgeAnimation(bool move_to_left) {
   animations->AppendKeyframe(
       win_->composited_x(), win_->composited_y(),
       TimeDelta::FromMilliseconds(kNudgeAnimMs / 2));
+  win_->SetMoveCompositedAnimation(animations);
+}
+
+void BrowserWindow::DoSquishAnimation() {
+  const TimeDelta frame_time = TimeDelta::FromMilliseconds(kSquishAnimMs / 3);
+
+  AnimationPair* animations = win_->CreateScaleCompositedAnimation();
+  animations->AppendKeyframe(kSquishAnimShrinkScale, 1.0, frame_time);
+  animations->AppendKeyframe(kSquishAnimReboundScale, 1.0, frame_time);
+  animations->AppendKeyframe(1.0, 1.0, frame_time);
+  win_->SetScaleCompositedAnimation(animations);
+
+  const Rect bounds = win_->client_bounds();
+  animations = win_->CreateMoveCompositedAnimation();
+  animations->AppendKeyframe(
+      bounds.x + 0.5 * (1.0 - kSquishAnimShrinkScale) * bounds.width, bounds.y,
+      frame_time);
+  animations->AppendKeyframe(
+      bounds.x + 0.5 * (1.0 - kSquishAnimReboundScale) * bounds.width, bounds.y,
+      frame_time);
+  animations->AppendKeyframe(bounds.x, bounds.y, frame_time);
   win_->SetMoveCompositedAnimation(animations);
 }
 

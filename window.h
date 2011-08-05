@@ -396,6 +396,11 @@ class Window {
   // Takes ownership of |animations|.
   void SetMoveCompositedAnimation(AnimationPair* animations);
 
+  // Create and apply an animation of the window's scale.
+  // See CreateMoveCompositedAnimation() and SetMoveCompositedAnimation().
+  AnimationPair* CreateScaleCompositedAnimation();
+  void SetScaleCompositedAnimation(AnimationPair* animations);
+
   // Handle us having sent a request to the X server to map this
   // (non-override-redirect) window.  We send a _NET_WM_SYNC_REQUEST
   // message to the window and send a synthetic ConfigureNotify event, so

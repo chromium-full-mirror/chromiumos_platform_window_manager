@@ -40,6 +40,22 @@ void MockCompositor::Actor::SetMoveAnimation(AnimationPair* animations) {
   delete animations;
 }
 
+void MockCompositor::Actor::Scale(double scale_x, double scale_y, int anim_ms) {
+  scale_x_ = scale_x;
+  scale_y_ = scale_y;
+}
+
+AnimationPair* MockCompositor::Actor::CreateScaleAnimation() {
+  return new AnimationPair(
+      new Animation(scale_x_, GetMonotonicTime()),
+      new Animation(scale_y_, GetMonotonicTime()));
+}
+
+void MockCompositor::Actor::SetScaleAnimation(AnimationPair* animations) {
+  CHECK(animations);
+  delete animations;
+}
+
 void MockCompositor::Actor::Raise(Compositor::Actor* other) {
   CHECK(parent_);
   CHECK(other);

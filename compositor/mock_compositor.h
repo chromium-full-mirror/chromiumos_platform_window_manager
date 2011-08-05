@@ -73,10 +73,9 @@ class MockCompositor : public Compositor {
     virtual void MoveY(int y, int anim_ms) { Move(x_, y, anim_ms); }
     virtual AnimationPair* CreateMoveAnimation();
     virtual void SetMoveAnimation(AnimationPair* animations);
-    virtual void Scale(double scale_x, double scale_y, int anim_ms) {
-      scale_x_ = scale_x;
-      scale_y_ = scale_y;
-    }
+    virtual void Scale(double scale_x, double scale_y, int anim_ms);
+    virtual AnimationPair* CreateScaleAnimation();
+    virtual void SetScaleAnimation(AnimationPair* animations);
     virtual void SetOpacity(double opacity, int anim_ms) { opacity_ = opacity; }
     virtual void Show() { is_shown_ = true; }
     virtual void Hide() { is_shown_ = false; }
