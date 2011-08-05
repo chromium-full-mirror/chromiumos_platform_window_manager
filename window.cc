@@ -964,6 +964,19 @@ void Window::SetMoveCompositedAnimation(AnimationPair* animations) {
     damage_debug_group_->Move(composited_x(), composited_y(), 0);
 }
 
+AnimationPair* Window::CreateScaleCompositedAnimation() {
+  DCHECK(actor_.get());
+  return actor_->CreateScaleAnimation();
+}
+
+void Window::SetScaleCompositedAnimation(AnimationPair* animations) {
+  DCHECK(animations);
+  DCHECK(actor_.get());
+  composited_scale_x_ = animations->first_animation().GetEndValue();
+  composited_scale_y_ = animations->second_animation().GetEndValue();
+  actor_->SetScaleAnimation(animations);
+}
+
 void Window::HandleMapRequested() {
   DCHECK(xid_);
   DCHECK(!override_redirect_)

@@ -117,6 +117,8 @@ class RealCompositor : public Compositor {
     virtual AnimationPair* CreateMoveAnimation();
     virtual void SetMoveAnimation(AnimationPair* animations);
     virtual void Scale(double scale_x, double scale_y, int duration_ms);
+    virtual AnimationPair* CreateScaleAnimation();
+    virtual void SetScaleAnimation(AnimationPair* animations);
     virtual void SetOpacity(double opacity, int duration_ms);
     virtual void Show() { SetIsShown(true); }
     virtual void Hide() { SetIsShown(false); }

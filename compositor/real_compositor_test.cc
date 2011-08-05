@@ -704,7 +704,15 @@ TEST_F(RealCompositorTest, LayerVisitorTopFullscreenWindow) {
   EXPECT_TRUE(layer_visitor.has_fullscreen_actor());
   EXPECT_EQ(layer_visitor.top_fullscreen_actor(), actor1.get());
 
-  // Test no fullscreen opaque actor on top.
+  // If the actor is covering the entire screen but scaled, we should report
+  // _not_ having a fullscreen actor -- we need to composite to get the scaling.
+  actor1->Scale(2.0, 2.0, 0);
+  stage->Accept(&layer_visitor);
+  EXPECT_FALSE(layer_visitor.has_fullscreen_actor());
+  EXPECT_TRUE(layer_visitor.top_fullscreen_actor() == NULL);
+  actor1->Scale(1.0, 1.0, 0);
+
+  // Test having a non-fullscreen opaque actor on top.
   actor1->Hide();
   actor2->Show();
   actor3->Show();

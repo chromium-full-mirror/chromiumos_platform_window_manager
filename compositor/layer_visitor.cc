@@ -256,7 +256,11 @@ void LayerVisitor::VisitTexturedQuadActor(
       !actor->IsTransformed() &&
       stage_actor_->using_passthrough_projection();
 
-  if (actor->is_opaque() && result == CULLING_WINDOW_FULLSCREEN)
+  // Don't claim that scaled actors are fullscreen, even if they're covering the
+  // whole screen.  We need to continue compositing in this case so the scaling
+  // will be visible.
+  if (actor->is_opaque() && result == CULLING_WINDOW_FULLSCREEN &&
+      actor->GetXScale() == 1.0 && actor->GetYScale() == 1.0)
     has_fullscreen_actor_ = true;
 
   // Subtract opaque screen aligned quads from clip region to avoid

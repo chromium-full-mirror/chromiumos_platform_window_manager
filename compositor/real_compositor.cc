@@ -179,6 +179,21 @@ void RealCompositor::Actor::Scale(double scale_x, double scale_y,
                duration);
 }
 
+AnimationPair* RealCompositor::Actor::CreateScaleAnimation() {
+  Animation* x_anim = CreateAnimationForField(&scale_x_);
+  Animation* y_anim = CreateAnimationForField(&scale_y_);
+  return new AnimationPair(x_anim, y_anim);
+}
+
+void RealCompositor::Actor::SetScaleAnimation(AnimationPair* animations) {
+  DCHECK(animations);
+  SetAnimationForField(
+      &float_animations_, &scale_x_, animations->release_first_animation());
+  SetAnimationForField(
+      &float_animations_, &scale_y_, animations->release_second_animation());
+  delete animations;
+}
+
 void RealCompositor::Actor::SetOpacity(double opacity, int duration_ms) {
   AnimateField(&float_animations_, &opacity_, static_cast<float>(opacity),
                TimeDelta::FromMilliseconds(duration_ms));
