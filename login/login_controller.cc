@@ -241,8 +241,10 @@ void LoginController::HandleWindowMap(Window* win) {
 
   switch (win->type()) {
     case chromeos::WM_IPC_WINDOW_LOGIN_GUEST: {
-      if (wizard_window_)
+      if (wizard_window_) {
         LOG(WARNING) << "Two wizard windows encountered";
+        registrar_.UnregisterForWindowEvents(wizard_window_->xid());
+      }
       wizard_window_ = win;
       wm_->focus_manager()->UseClickToFocusForWindow(
           wizard_window_, FocusManager::PASS_CLICKS_THROUGH);
@@ -275,8 +277,10 @@ void LoginController::HandleWindowMap(Window* win) {
       break;
     }
     case chromeos::WM_IPC_WINDOW_LOGIN_BACKGROUND: {
-      if (background_window_)
+      if (background_window_) {
         LOG(WARNING) << "Two background windows encountered";
+        registrar_.UnregisterForWindowEvents(background_window_->xid());
+      }
       background_window_ = win;
       wm_->focus_manager()->UseClickToFocusForWindow(
           background_window_, FocusManager::PASS_CLICKS_THROUGH);
@@ -284,8 +288,10 @@ void LoginController::HandleWindowMap(Window* win) {
       break;
     }
     case chromeos::WM_IPC_WINDOW_LOGIN_WEBUI: {
-      if (webui_window_)
+      if (webui_window_) {
         LOG(WARNING) << "Two webui browser windows encountered";
+        registrar_.UnregisterForWindowEvents(webui_window_->xid());
+      }
       webui_window_ = win;
       wm_->focus_manager()->UseClickToFocusForWindow(
           webui_window_, FocusManager::PASS_CLICKS_THROUGH);
