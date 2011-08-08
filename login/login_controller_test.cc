@@ -1295,6 +1295,31 @@ TEST_F(LoginControllerTest, HandleWindowMapRequestsWebUILoginWindow) {
   EXPECT_EQ(webui_window_xid_, GetActiveWindowProperty());
 }
 
+// Check that when we see duplicate wizard windows, we unregister our interest
+// in the first one when the second one is mapped so that we won't fail an
+// assert if the first window is destroyed later.  This is just a shot in the
+// dark as a possible cause of http://crosbug.com/18809.
+TEST_F(LoginControllerTest, HandleDuplicateWindows) {
+  CreateWebUILoginWindow();
+
+  XWindow wizard_xid1 = CreateSimpleWindow();
+  wm_->wm_ipc()->SetWindowType(
+      wizard_xid1, chromeos::WM_IPC_WINDOW_LOGIN_GUEST, NULL);
+  SendInitialEventsForWindow(wizard_xid1);
+
+  XWindow wizard_xid2 = CreateSimpleWindow();
+  wm_->wm_ipc()->SetWindowType(
+      wizard_xid2, chromeos::WM_IPC_WINDOW_LOGIN_GUEST, NULL);
+  SendInitialEventsForWindow(wizard_xid2);
+
+  XEvent event;
+  xconn_->UnmapWindow(wizard_xid1);
+  xconn_->InitUnmapEvent(&event, wizard_xid1);
+  wm_->HandleEvent(&event);
+  xconn_->InitDestroyWindowEvent(&event, wizard_xid1);
+  wm_->HandleEvent(&event);
+}
+
 // Test that we focus the first controls window as soon as we map it.
 TEST_F(LoginControllerTest, FocusFirstControlsWindowImmediately) {
   // Create just a background window.
