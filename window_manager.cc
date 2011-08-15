@@ -60,6 +60,9 @@ DEFINE_string(logged_out_log_dir,
 DEFINE_string(unaccelerated_graphics_image,
               "../assets/images/unaccelerated_graphics.png",
               "Image to display when using unaccelerated rendering");
+DEFINE_string(debug_build_image,
+              "../assets/images/debug_build.png",
+              "Image to display when running a debug build");
 DEFINE_bool(unredirect_fullscreen_window,
             false,
             "Enable/disable compositing optimization that automatically turns"
@@ -88,16 +91,12 @@ using window_manager::util::XidStr;
 
 namespace window_manager {
 
-// How many pixels should |unaccelerated_graphics_actor_| be offset from
+// How many pixels should the "Unaccelerated graphics" message be offset from
 // the upper-left corner of the screen?
 static const int kUnacceleratedGraphicsActorOffsetPixels = 5;
 
-// How long should we wait before hiding |unaccelerated_graphics_actor_|?
-static const int kUnacceleratedGraphicsActorHideTimeoutMs = 15000;
-
-// How quickly should we fade out |unaccelerated_graphics_actor_| when
-// hiding it?
-static const int kUnacceleratedGraphicsActorHideAnimMs = 500;
+// How long should we wait before dropping |informational_actors_|?
+static const int kDropInformationalActorsTimeoutMs = 15000;
 
 // How frequently should we send _NET_WM_PING messages to Chrome, and how
 // long should we wait for a response to each before killing the process?
@@ -229,7 +228,7 @@ WindowManager::WindowManager(EventLoop* event_loop,
       wm_ipc_version_(1),
       logged_in_(false),
       initialize_logging_(false),
-      hide_unaccelerated_graphics_actor_timeout_id_(EventLoop::kUnsetTimeoutId),
+      drop_informational_actors_timeout_id_(EventLoop::kUnsetTimeoutId),
       chrome_watchdog_timeout_id_(EventLoop::kUnsetTimeoutId),
       num_compositing_requests_(0) {
   CHECK(event_loop_);
@@ -243,8 +242,7 @@ WindowManager::~WindowManager() {
 
   event_loop_->RemoveTimeoutIfSet(&query_keyboard_state_timeout_id_);
   event_loop_->RemoveTimeoutIfSet(&chrome_watchdog_timeout_id_);
-  event_loop_->RemoveTimeoutIfSet(
-      &hide_unaccelerated_graphics_actor_timeout_id_);
+  event_loop_->RemoveTimeoutIfSet(&drop_informational_actors_timeout_id_);
 
   if (panel_manager_.get())
     panel_manager_->UnregisterAreaChangeListener(this);
@@ -400,25 +398,7 @@ bool WindowManager::Init() {
   CHECK(xconn_->RemoveInputRegionFromWindow(overlay_xid_));
   CHECK(xconn_->RemoveInputRegionFromWindow(stage_xid_));
 
-  if (!compositor_->TexturePixmapActorUsesFastPath() &&
-      !FLAGS_unaccelerated_graphics_image.empty()) {
-    unaccelerated_graphics_actor_.reset(
-        compositor_->CreateImageFromFile(FLAGS_unaccelerated_graphics_image));
-    unaccelerated_graphics_actor_->Move(
-        kUnacceleratedGraphicsActorOffsetPixels,
-        kUnacceleratedGraphicsActorOffsetPixels,
-        0);
-    unaccelerated_graphics_actor_->SetOpacity(1.f, 0);
-    stage_->AddActor(unaccelerated_graphics_actor_.get());
-    stacking_manager_->StackActorAtTopOfLayer(
-        unaccelerated_graphics_actor_.get(), StackingManager::LAYER_DEBUGGING);
-    unaccelerated_graphics_actor_->Show();
-    hide_unaccelerated_graphics_actor_timeout_id_ =
-        event_loop_->AddTimeout(
-            NewPermanentCallback(
-                this, &WindowManager::HideUnacceleratedGraphicsActor),
-            kUnacceleratedGraphicsActorHideTimeoutMs, 0);
-  }
+  InitInformationalActors();
 
   compositor_->RegisterCompositionChangeListener(this);
 
@@ -2036,12 +2016,52 @@ void WindowManager::CreateStartupBackground() {
   startup_background_->Show();
 }
 
-void WindowManager::HideUnacceleratedGraphicsActor() {
-  if (unaccelerated_graphics_actor_.get())
-    unaccelerated_graphics_actor_->SetOpacity(
-        0.f, kUnacceleratedGraphicsActorHideAnimMs );
-  event_loop_->RemoveTimeoutIfSet(
-      &hide_unaccelerated_graphics_actor_timeout_id_);
+void WindowManager::InitInformationalActors() {
+  if (!compositor_->TexturePixmapActorUsesFastPath() &&
+      !FLAGS_unaccelerated_graphics_image.empty()) {
+    shared_ptr<Compositor::Actor> unaccelerated_graphics_actor(
+        compositor_->CreateImageFromFile(FLAGS_unaccelerated_graphics_image));
+    informational_actors_.push_back(unaccelerated_graphics_actor);
+
+    stage_->AddActor(unaccelerated_graphics_actor.get());
+    unaccelerated_graphics_actor->Move(
+        kUnacceleratedGraphicsActorOffsetPixels,
+        kUnacceleratedGraphicsActorOffsetPixels,
+        0);
+    stacking_manager_->StackActorAtTopOfLayer(
+        unaccelerated_graphics_actor.get(), StackingManager::LAYER_DEBUGGING);
+  }
+
+#ifndef NDEBUG
+  if (!FLAGS_debug_build_image.empty()) {
+    shared_ptr<Compositor::Actor> debug_build_actor(
+        compositor_->CreateImageFromFile(FLAGS_debug_build_image));
+    informational_actors_.push_back(debug_build_actor);
+
+    stage_->AddActor(debug_build_actor.get());
+    debug_build_actor->Move(
+        root_bounds_.right() - debug_build_actor->GetWidth(),
+        root_bounds_.bottom() - debug_build_actor->GetHeight(),
+        0);
+    stacking_manager_->StackActorAtTopOfLayer(
+        debug_build_actor.get(), StackingManager::LAYER_DEBUGGING);
+  }
+#endif
+
+  if (!informational_actors_.empty()) {
+    DCHECK_EQ(drop_informational_actors_timeout_id_,
+              EventLoop::kUnsetTimeoutId);
+    drop_informational_actors_timeout_id_ =
+        event_loop_->AddTimeout(
+            NewPermanentCallback(
+                this, &WindowManager::HandleDropInformationalActorsTimeout),
+            kDropInformationalActorsTimeoutMs, 0);
+  }
+}
+
+void WindowManager::HandleDropInformationalActorsTimeout() {
+  informational_actors_.clear();
+  event_loop_->RemoveTimeoutIfSet(&drop_informational_actors_timeout_id_);
 }
 
 void WindowManager::DisableCompositing() {

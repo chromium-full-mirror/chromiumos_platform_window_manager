@@ -452,8 +452,12 @@ class WindowManager : public PanelManagerAreaChangeListener,
   // initial contents of the root window.  Called by Init().
   void CreateStartupBackground();
 
-  // Callback that fades out |unaccelerated_graphics_actor_|.
-  void HideUnacceleratedGraphicsActor();
+  // Helper method that creates actors and stores them in
+  // |informational_actors_|.  Called by Init().
+  void InitInformationalActors();
+
+  // Callback that clears |informational_actors_|.
+  void HandleDropInformationalActorsTimeout();
 
   // Reshape |overlay_xid_| to be transparent, redirect
   // |unredirected_fullscreen_xid_|, and tell the compositor to stop drawing.
@@ -612,12 +616,13 @@ class WindowManager : public PanelManagerAreaChangeListener,
   // a monotonically-increasing time as returned from GetMonotonicTime().
   base::TimeTicks video_property_update_time_;
 
-  // Image that we display onscreen to let the user know when we're not
-  // fully hardware-accelerated, or NULL if we are accelerated.
-  scoped_ptr<Compositor::ImageActor> unaccelerated_graphics_actor_;
+  // Images that we display onscreen at startup to inform the user about
+  // something (e.g. "Unaccelerated graphics", "Debug build", etc.).  Drawing
+  // text would be nicer but we don't link against any graphics libraries.
+  ActorVector informational_actors_;
 
-  // ID for the timeout that calls HideUnacceleratedGraphicsActor().
-  int hide_unaccelerated_graphics_actor_timeout_id_;
+  // ID for the timeout that calls HandleDropInformationalActorsTimeout().
+  int drop_informational_actors_timeout_id_;
 
   // ID for the timeout that calls PingChrome().
   int chrome_watchdog_timeout_id_;
