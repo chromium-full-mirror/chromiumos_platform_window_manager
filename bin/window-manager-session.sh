@@ -21,6 +21,7 @@ LOGGED_OUT_SCREENSHOT_DIR="/tmp"
 XTERM_COMMAND="/usr/bin/cros-term"
 
 exec "${WM}"                                                            \
+  --debug_build_image="${IMAGES}/debug_build.png"                       \
   --initial_chrome_window_mapped_file="${INITIAL_CHROME_FILE}"          \
   --logged_in_log_dir="${LOGGED_IN_LOG_DIR}"                            \
   --logged_in_screenshot_output_dir="${LOGGED_IN_SCREENSHOT_DIR}"       \
