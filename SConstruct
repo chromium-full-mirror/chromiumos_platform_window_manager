@@ -62,7 +62,7 @@ backend = ARGUMENTS.get('BACKEND', 'OPENGL').lower()
 # Start a new environment for the window manager.
 wm_env = base_env.Clone()
 
-wm_env.Append(LIBS=Split('chromeos metrics protobuf'))
+wm_env.Append(LIBS=Split('metrics protobuf'))
 wm_env.ParseConfig(pkgconfig + ' --cflags --libs dbus-1 libpcrecpp libpng12 ' +
                    'xcb x11-xcb xcb-composite xcb-randr xcb-shape xcb-damage ' +
                    'xcb-sync xcomposite xdamage xext xrender')
