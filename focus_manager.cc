@@ -41,13 +41,13 @@ void FocusManager::FocusWindow(Window* win, XTime timestamp) {
   }
 
   if (focused_win_ && click_to_focus_windows_.count(focused_win_))
-    focused_win_->AddButtonGrab();
+    AddButtonGrabs(focused_win_);
 
   focused_win_ = win;
   if (focused_win_) {
     focused_win_->TakeFocus(timestamp);
     if (click_to_focus_windows_.count(focused_win_))
-      focused_win_->RemoveButtonGrab();
+      RemoveButtonGrabs(focused_win_);
   } else {
     wm_->xconn()->FocusWindow(wm_->xconn()->GetRootWindow(), timestamp);
   }
@@ -71,7 +71,7 @@ void FocusManager::UseClickToFocusForWindow(Window* win,
   } else {
     click_to_focus_windows_.insert(make_pair(win, policy));
     if (focused_win_ != win)
-      win->AddButtonGrab();
+      AddButtonGrabs(win);
   }
 }
 
@@ -80,7 +80,7 @@ void FocusManager::HandleWindowUnmap(Window* win) {
   map<Window*, ClickToFocusPolicy>::iterator it =
       click_to_focus_windows_.find(win);
   if (it != click_to_focus_windows_.end()) {
-    win->RemoveButtonGrab();
+    RemoveButtonGrabs(win);
     click_to_focus_windows_.erase(it);
   }
 
@@ -111,6 +111,20 @@ void FocusManager::UnregisterFocusChangeListener(
     FocusChangeListener* listener) {
   int num_removed = focus_change_listeners_.erase(listener);
   DCHECK_EQ(num_removed, 1) << "Listener " << listener << " wasn't registered";
+}
+
+void FocusManager::AddButtonGrabs(Window* win) {
+  DCHECK(win);
+  win->AddButtonGrab(1);
+  win->AddButtonGrab(2);
+  win->AddButtonGrab(3);
+}
+
+void FocusManager::RemoveButtonGrabs(Window* win) {
+  DCHECK(win);
+  win->RemoveButtonGrab(1);
+  win->RemoveButtonGrab(2);
+  win->RemoveButtonGrab(3);
 }
 
 }  // namespace window_manager

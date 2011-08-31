@@ -50,12 +50,13 @@ class FocusManager {
   // can be obtained from WindowManager::GetCurrentTimeFromServer().
   void FocusWindow(Window* win, XTime timestamp);
 
-  // Use click-to-focus for a window.  We install a button grab on the
-  // window so that we'll be notified if it gets clicked.  The caller
-  // remains responsible for seeing the button press later and deciding to
-  // focus the window by calling FocusWindow(); we just handle adding and
-  // removing the button grab as needed when the window loses or gains the
-  // focus.  This is reset when the window gets unmapped.
+  // Use click-to-focus for a window.  We install a button grab on the window so
+  // that we'll be notified if it gets clicked (with buttons 1, 2, and 3 only --
+  // no scrollwheel events).  The caller remains responsible for seeing the
+  // button press later and deciding to focus the window by calling
+  // FocusWindow(); we just handle adding and removing the button grabs as
+  // needed when the window loses or gains the focus.  This is reset when the
+  // window gets unmapped.
   void UseClickToFocusForWindow(Window* win, ClickToFocusPolicy policy);
 
   // Handle a window being unmapped.  Called by WindowManager.
@@ -74,6 +75,10 @@ class FocusManager {
   void UnregisterFocusChangeListener(FocusChangeListener* listener);
 
  private:
+  // Add or remove button grabs on the passed-in window.
+  void AddButtonGrabs(Window* win);
+  void RemoveButtonGrabs(Window* win);
+
   WindowManager* wm_;  // not owned
 
   // The currently-focused window, or NULL if no window is focused.

@@ -1434,6 +1434,41 @@ TEST_F(LayoutManager2Test, DontOverlapWindowsByDefault) {
             layout_manager()->layout_mode());
 }
 
+TEST_F(LayoutManager2Test, IgnoreScrollwheelButtons) {
+  // Create two windows.  The second one should get the focus.
+  XWindow xid = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid);
+  XWindow xid2 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid2);
+  ASSERT_EQ(xid2, xconn_->focused_xid());
+
+  // We should have grabbed buttons 1-3 but not 4 and 5 on the first window.
+  MockXConnection::WindowInfo* info = xconn_->GetWindowInfoOrDie(xid);
+  EXPECT_FALSE(info->button_is_grabbed(0));  // AnyButton
+  EXPECT_TRUE(info->button_is_grabbed(1));
+  EXPECT_TRUE(info->button_is_grabbed(2));
+  EXPECT_TRUE(info->button_is_grabbed(3));
+  EXPECT_FALSE(info->button_is_grabbed(4));  // scroll up
+  EXPECT_FALSE(info->button_is_grabbed(5));  // scroll down
+
+  // Open a third window.  It should take the focus.
+  XWindow xid3 = CreateSimpleWindow();
+  SendInitialEventsForWindow(xid3);
+  ASSERT_EQ(xid3, xconn_->focused_xid());
+
+  // We should ignore scrollwheel button presses on the input window covering
+  // the first browser window.
+  XEvent event;
+  xconn_->InitButtonPressEvent(
+      &event, layout_manager()->left_edge_input_xid_, Point(0, 0), 4);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(xid3, xconn_->focused_xid());
+  xconn_->InitButtonPressEvent(
+      &event, layout_manager()->left_edge_input_xid_, Point(0, 0), 5);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(xid3, xconn_->focused_xid());
+}
+
 }  // namespace window_manager
 
 int main(int argc, char** argv) {

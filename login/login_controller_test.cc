@@ -483,7 +483,7 @@ TEST_F(LoginControllerTest, Focus) {
   SendInitialEventsForWindow(other_xid);
   EXPECT_EQ(other_xid, xconn_->focused_xid());
   EXPECT_EQ(other_xid, GetActiveWindowProperty());
-  EXPECT_FALSE(other_info->button_is_grabbed(0));
+  EXPECT_FALSE(other_info->button_is_grabbed(1));
 
   // Check that override-redirect non-login window (i.e. tooltip) won't be
   // focused.
@@ -501,8 +501,8 @@ TEST_F(LoginControllerTest, Focus) {
       xconn_->GetWindowInfoOrDie(background_xid_);
   MockXConnection::WindowInfo* controls_info =
       xconn_->GetWindowInfoOrDie(entries_[1].controls_xid);
-  EXPECT_TRUE(background_info->button_is_grabbed(0));
-  EXPECT_TRUE(controls_info->button_is_grabbed(0));
+  EXPECT_TRUE(background_info->button_is_grabbed(1));
+  EXPECT_TRUE(controls_info->button_is_grabbed(1));
 
   // After we click on the background, the second entry's controls window
   // should be refocused and a button grab should be installed on the
@@ -513,8 +513,8 @@ TEST_F(LoginControllerTest, Focus) {
   wm_->HandleEvent(&event);
   EXPECT_EQ(entries_[1].controls_xid, xconn_->focused_xid());
   EXPECT_EQ(entries_[1].controls_xid, GetActiveWindowProperty());
-  EXPECT_FALSE(controls_info->button_is_grabbed(0));
-  EXPECT_TRUE(other_info->button_is_grabbed(0));
+  EXPECT_FALSE(controls_info->button_is_grabbed(1));
+  EXPECT_TRUE(other_info->button_is_grabbed(1));
 }
 
 // Test that the login controller focuses the wizard window when no entries
@@ -610,8 +610,8 @@ TEST_F(LoginControllerTest, Modality) {
   wm_->HandleEvent(&event);
   EXPECT_EQ(transient_xid, xconn_->focused_xid());
   EXPECT_EQ(transient_xid, GetActiveWindowProperty());
-  EXPECT_TRUE(controls_info->button_is_grabbed(0));
-  EXPECT_FALSE(transient_info->button_is_grabbed(0));
+  EXPECT_TRUE(controls_info->button_is_grabbed(1));
+  EXPECT_FALSE(transient_info->button_is_grabbed(1));
   EXPECT_EQ(initial_num_replays,
             xconn_->num_pointer_ungrabs_with_replayed_events());
 }

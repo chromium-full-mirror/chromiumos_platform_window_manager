@@ -77,7 +77,9 @@ TEST_F(PanelBarTest, Basic) {
   wm_->HandleEvent(&event);
   EXPECT_EQ(None, xconn_->pointer_grab_xid());
   EXPECT_EQ(toplevel_xid, xconn_->focused_xid());
-  EXPECT_TRUE(content_info->button_is_grabbed(AnyButton));
+  EXPECT_TRUE(content_info->button_is_grabbed(1));
+  EXPECT_TRUE(content_info->button_is_grabbed(2));
+  EXPECT_TRUE(content_info->button_is_grabbed(3));
   EXPECT_EQ(toplevel_xid, GetActiveWindowProperty());
 
   // The titlebar should keep its initial height but be stretched to the
@@ -124,7 +126,9 @@ TEST_F(PanelBarTest, Basic) {
   wm_->HandleEvent(&event);
   EXPECT_EQ(None, xconn_->pointer_grab_xid());
   EXPECT_EQ(content_xid, xconn_->focused_xid());
-  EXPECT_FALSE(content_info->button_is_grabbed(AnyButton));
+  EXPECT_FALSE(content_info->button_is_grabbed(1));
+  EXPECT_FALSE(content_info->button_is_grabbed(2));
+  EXPECT_FALSE(content_info->button_is_grabbed(3));
   EXPECT_EQ(content_xid, GetActiveWindowProperty());
 
   // Create a second toplevel window.

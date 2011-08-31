@@ -1395,9 +1395,13 @@ bool WindowManager::UpdateClientListStackingProperty() {
 }
 
 void WindowManager::HandleButtonPress(const XButtonEvent& e) {
-  DLOG(INFO) << "Handling button press in window " << XidStr(e.window)
-             << " at relative (" << e.x << ", " << e.y << "), absolute ("
-             << e.x_root << ", " << e.y_root << ") with button " << e.button;
+  // Scrollwheel events can be bursty; don't log them.
+  if (e.button <= 3) {
+    DLOG(INFO) << "Handling button press in window " << XidStr(e.window)
+               << " at relative (" << e.x << ", " << e.y << "), absolute ("
+               << e.x_root << ", " << e.y_root << ") with button " << e.button;
+  }
+
   Window* win = GetWindow(e.window);
   if (win)
     focus_manager_->HandleButtonPressInWindow(win, e.time);
@@ -1412,9 +1416,12 @@ void WindowManager::HandleButtonPress(const XButtonEvent& e) {
 }
 
 void WindowManager::HandleButtonRelease(const XButtonEvent& e) {
-  DLOG(INFO) << "Handling button release in window " << XidStr(e.window)
-             << " at relative (" << e.x << ", " << e.y << "), absolute ("
-             << e.x_root << ", " << e.y_root << ") with button " << e.button;
+  // Scrollwheel events can be bursty; don't log them.
+  if (e.button <= 3) {
+    DLOG(INFO) << "Handling button release in window " << XidStr(e.window)
+               << " at relative (" << e.x << ", " << e.y << "), absolute ("
+               << e.x_root << ", " << e.y_root << ") with button " << e.button;
+  }
 
   const Point relative_pos(e.x, e.y);
   const Point absolute_pos(e.x_root, e.y_root);

@@ -118,6 +118,7 @@ class LayoutManager2 : public EventConsumer,
   FRIEND_TEST(LayoutManager2Test, ClickToActivateBrowser);
   FRIEND_TEST(LayoutManager2Test, AvoidJankOnLayoutModeChange);
   FRIEND_TEST(LayoutManager2Test, ResizeHandleActor);
+  FRIEND_TEST(LayoutManager2Test, IgnoreScrollwheelButtons);
 
   // Specifies ArrangeBrowserWindows()'s behavior with regard to assigning the
   // input focus.

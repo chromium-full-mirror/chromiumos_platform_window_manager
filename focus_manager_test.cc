@@ -77,10 +77,15 @@ TEST_F(FocusManagerTest, ClickToFocus) {
   Window win(wm_.get(), xid, false, geometry);
 
   // After we tell the focus manager that we want to use click-to-focus, it
-  // should install a button grab on the window.
+  // should install button grabs on the window.
   focus_manager_->UseClickToFocusForWindow(
       &win, FocusManager::PASS_CLICKS_THROUGH);
-  EXPECT_TRUE(info->button_is_grabbed(0));
+  EXPECT_FALSE(info->button_is_grabbed(0));  // AnyButton
+  EXPECT_TRUE(info->button_is_grabbed(1));
+  EXPECT_TRUE(info->button_is_grabbed(2));
+  EXPECT_TRUE(info->button_is_grabbed(3));
+  EXPECT_FALSE(info->button_is_grabbed(4));  // scroll up
+  EXPECT_FALSE(info->button_is_grabbed(5));  // scroll down
 
   // Grab the pointer as if a button had been pressed and then make sure
   // that the focus manager automatically terminates the grab.
@@ -101,17 +106,25 @@ TEST_F(FocusManagerTest, ClickToFocus) {
   // focus.
   focus_manager_->UseClickToFocusForWindow(
       &win2, FocusManager::PASS_CLICKS_THROUGH);
-  EXPECT_FALSE(info2->button_is_grabbed(0));
+  EXPECT_FALSE(info2->button_is_grabbed(1));
+  EXPECT_FALSE(info2->button_is_grabbed(2));
+  EXPECT_FALSE(info2->button_is_grabbed(3));
 
   // If we focus the first window, its button grab should be removed and
   // one should be added on the second window.
   focus_manager_->FocusWindow(&win, timestamp++);
-  EXPECT_FALSE(info->button_is_grabbed(0));
-  EXPECT_TRUE(info2->button_is_grabbed(0));
+  EXPECT_FALSE(info->button_is_grabbed(1));
+  EXPECT_FALSE(info->button_is_grabbed(2));
+  EXPECT_FALSE(info->button_is_grabbed(3));
+  EXPECT_TRUE(info2->button_is_grabbed(1));
+  EXPECT_TRUE(info2->button_is_grabbed(2));
+  EXPECT_TRUE(info2->button_is_grabbed(3));
 
   // When the second window is unmapped, the button grab should be removed.
   focus_manager_->HandleWindowUnmap(&win2);
-  EXPECT_FALSE(info2->button_is_grabbed(0));
+  EXPECT_FALSE(info2->button_is_grabbed(1));
+  EXPECT_FALSE(info2->button_is_grabbed(2));
+  EXPECT_FALSE(info2->button_is_grabbed(3));
 }
 
 // Test that we notify FocusChangeListeners when the focus changes.

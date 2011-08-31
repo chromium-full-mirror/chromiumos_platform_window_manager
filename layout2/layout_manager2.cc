@@ -361,6 +361,10 @@ void LayoutManager2::HandleButtonPress(XWindow xid,
                                        const Point& absolute_pos,
                                        int button,
                                        XTime timestamp) {
+  // Bail out early on scrollwheel events, which can come in quickly.
+  if (button > 3)
+    return;
+
   if (xid == resize_handle_xid_ && button == 1) {
     HandleResizeDragStart(absolute_pos);
     return;

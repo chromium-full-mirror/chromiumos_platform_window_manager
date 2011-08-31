@@ -606,17 +606,17 @@ bool Window::SendPing(XTime timestamp) {
             xid_, xid_, wm_->GetXAtom(ATOM_WM_PROTOCOLS), data, 0);
 }
 
-bool Window::AddButtonGrab() {
-  DLOG(INFO) << "Adding button grab for " << xid_str_;
+bool Window::AddButtonGrab(int button) {
+  DLOG(INFO) << "Adding button grab for " << button << " on " << xid_str_;
   DCHECK(xid_);
   return wm_->xconn()->AddButtonGrabOnWindow(
-      xid_, AnyButton, ButtonPressMask, true);  // synchronous=true
+      xid_, button, ButtonPressMask, true);  // synchronous=true
 }
 
-bool Window::RemoveButtonGrab() {
-  DLOG(INFO) << "Removing button grab for " << xid_str_;
+bool Window::RemoveButtonGrab(int button) {
+  DLOG(INFO) << "Removing button grab for " << button << " on " << xid_str_;
   DCHECK(xid_);
-  return wm_->xconn()->RemoveButtonGrabOnWindow(xid_, AnyButton);
+  return wm_->xconn()->RemoveButtonGrabOnWindow(xid_, button);
 }
 
 void Window::GetMaxSize(const Size& desired_size, Size* size_out) const {
