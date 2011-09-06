@@ -967,7 +967,7 @@ TEST_F(LoginControllerTest, NoCrashOnInconsistenEntry) {
   xconn_->UnmapWindow(entries_[1].border_xid);
   xconn_->InitUnmapEvent(&event, entries_[1].border_xid);
   wm_->HandleEvent(&event);
-  entries_[1].border_xid = NULL;
+  entries_[1].border_xid = 0;
 
   // Unmap all other windows.
   UnmapLoginEntry(0);

@@ -255,8 +255,8 @@ TEST_F(WindowManagerTest, InputWindows) {
   EXPECT_EQ(200, info->bounds.y);
   EXPECT_EQ(300, info->bounds.width);
   EXPECT_EQ(400, info->bounds.height);
-  EXPECT_EQ(true, info->mapped);
-  EXPECT_EQ(true, info->override_redirect);
+  EXPECT_TRUE(info->mapped);
+  EXPECT_TRUE(info->override_redirect);
   EXPECT_EQ(event_mask, info->event_mask);
 
   // Move and resize the window.
@@ -265,7 +265,7 @@ TEST_F(WindowManagerTest, InputWindows) {
   EXPECT_EQ(600, info->bounds.y);
   EXPECT_EQ(700, info->bounds.width);
   EXPECT_EQ(800, info->bounds.height);
-  EXPECT_EQ(true, info->mapped);
+  EXPECT_TRUE(info->mapped);
 }
 
 TEST_F(WindowManagerTest, EventConsumer) {

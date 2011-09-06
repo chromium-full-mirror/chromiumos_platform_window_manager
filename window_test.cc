@@ -89,7 +89,7 @@ TEST_F(WindowTest, ChangeClient) {
   EXPECT_EQ(20, window.client_y());
   EXPECT_EQ(30, window.client_width());
   EXPECT_EQ(40, window.client_height());
-  EXPECT_EQ(false, window.mapped());
+  EXPECT_FALSE(window.mapped());
 
   EXPECT_TRUE(window.MapClient());
   EXPECT_TRUE(info->mapped);

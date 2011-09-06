@@ -25,6 +25,7 @@ extern "C" {
 #include "window_manager/key_bindings.h"
 #include "window_manager/mock_dbus_interface.h"
 #include "window_manager/stacking_manager.h"
+#include "window_manager/window.h"
 #include "window_manager/window_manager.h"
 #include "window_manager/wm_ipc.h"
 #include "window_manager/x11/mock_x_connection.h"
