@@ -383,7 +383,7 @@ void LoginController::HandleWindowUnmap(Window* win) {
     non_login_xids_.erase(*non_login_it);
     registrar_.UnregisterForWindowEvents(win->xid());
 
-    if (win->IsFocused() && !wm_->logged_in()) {
+    if (win->IsFocused() && (!wm_->logged_in() || webui_window_)) {
       // If the window was transient, pass the focus to its owner (as long
       // as it's not the background window, which we never want to receive
       // the focus); otherwise just focus the previously-focused login

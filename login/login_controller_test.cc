@@ -578,6 +578,29 @@ TEST_F(LoginControllerTest, FocusTransientParent) {
   EXPECT_EQ(entries_[0].controls_xid, GetActiveWindowProperty());
 }
 
+// Test that focus behaviour is preserved after the user has logged in when we
+// are performing a WebUI based login.
+TEST_F(LoginControllerTest, FocusTransientParentWebUILoggedIn) {
+  CreateWebUILoginWindow();
+  SetLoggedInState(true);
+
+  // When we open a transient dialog, it should get the focus.
+  const XWindow transient_xid = CreateSimpleWindow();
+  MockXConnection::WindowInfo* transient_info =
+      xconn_->GetWindowInfoOrDie(transient_xid);
+  transient_info->transient_for = webui_window_xid_;
+  SendInitialEventsForWindow(transient_xid);
+  EXPECT_EQ(transient_xid, xconn_->focused_xid());
+  EXPECT_EQ(transient_xid, GetActiveWindowProperty());
+
+  // If we unmap that dialog, the focus should go back to the WebUI window.
+  XEvent event;
+  xconn_->InitUnmapEvent(&event, transient_xid);
+  wm_->HandleEvent(&event);
+  EXPECT_EQ(webui_window_xid_, xconn_->focused_xid());
+  EXPECT_EQ(webui_window_xid_, GetActiveWindowProperty());
+}
+
 TEST_F(LoginControllerTest, Modality) {
   CreateLoginWindows(2, true, true, false);
   const XWindow controls_xid = entries_[0].controls_xid;
