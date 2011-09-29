@@ -43,7 +43,7 @@ static const int kFastCloseAnimMs = 150;
 
 // How long should we take to fade the screen locker window in in the
 // background once the screen has been locked?
-static const int kScreenLockerFadeInMs = 50;
+static const int kScreenLockerFadeInMs = 450;
 
 // How long we'll wait for another message after we enter the pre-lock or
 // pre-shutdown state before giving up and reverting back to the previous
@@ -311,13 +311,21 @@ void ScreenLockerHandler::HandleUnlocked() {
 
 void ScreenLockerHandler::HandlePreShutdown() {
   DLOG(INFO) << "Starting pre-shutdown animation";
-  if (snapshot_actor_.get()) {
-    // Make sure that we'll use a new snapshot.  If the power button was
-    // held since before the screen was locked, we don't want to reuse the
-    // snapshot taken while the screen was unlocked.
+
+  // Make sure that we'll use a new snapshot.  If the power button was held
+  // since before the screen was locked, we don't want to reuse the snapshot
+  // taken while the screen was unlocked.
+  if (snapshot_actor_.get())
     DestroySnapshotAndUpdateVisibilityGroup();
-    wm_->compositor()->ForceDraw();
+
+  // Also ensure that the screen locker window is fully opaque before we take
+  // the snapshot.
+  for (set<XWindow>::const_iterator it = screen_locker_xids_.begin();
+       it != screen_locker_xids_.end(); ++it) {
+    wm_->GetWindowOrDie(*it)->SetCompositedOpacity(1, 0);
   }
+  wm_->compositor()->ForceDraw();
+
   StartSlowCloseAnimation();
   wm_->compositor()->SetActiveVisibilityGroup(
       WindowManager::VISIBILITY_GROUP_SESSION_ENDING);
