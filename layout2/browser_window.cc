@@ -157,6 +157,8 @@ void BrowserWindow::TakeFocus(XTime timestamp) {
 }
 
 void BrowserWindow::HandleTransientWindowMap(Window* transient_win) {
+  if (!transient_win->is_rgba())
+    transient_win->SetShadowType(Shadow::TYPE_RECTANGULAR);
   transients_->AddWindow(transient_win);
 }
 

@@ -299,10 +299,14 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
   MockXConnection::WindowInfo* transient_info =
       xconn_->GetWindowInfoOrDie(transient_xid);
   transient_info->transient_for = xid;
+  transient_info->depth = 24;
   SendInitialEventsForWindow(transient_xid);
   EXPECT_EQ(xid2, xconn_->focused_xid());
-  EXPECT_EQ(Window::VISIBILITY_HIDDEN,
-            wm_->GetWindowOrDie(transient_xid)->visibility());
+  Window* transient_win = wm_->GetWindowOrDie(transient_xid);
+  EXPECT_EQ(Window::VISIBILITY_HIDDEN, transient_win->visibility());
+
+  // We should draw a shadow under the window since it's 24-bit.
+  EXPECT_TRUE(transient_win->shadow() != NULL);
 
   // Send a _NET_ACTIVE_WINDOW message asking the WM to focus |transient_xid|
   // and check that it focuses it and switches to |xid|.
@@ -315,8 +319,7 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
   EXPECT_EQ(kCenteredTransientBounds,
             xconn_->GetWindowInfoOrDie(transient_xid)->bounds);
   EXPECT_EQ(kCenteredTransientBounds, GetCompositedWindowBounds(transient_xid));
-  EXPECT_EQ(Window::VISIBILITY_SHOWN,
-            wm_->GetWindowOrDie(transient_xid)->visibility());
+  EXPECT_EQ(Window::VISIBILITY_SHOWN, transient_win->visibility());
   EXPECT_EQ(xconn_->root_bounds(), xconn_->GetWindowInfoOrDie(xid)->bounds);
   EXPECT_EQ(xconn_->root_bounds(), GetCompositedWindowBounds(xid));
 
@@ -325,17 +328,20 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
   MockXConnection::WindowInfo* transient_info2 =
       xconn_->GetWindowInfoOrDie(transient_xid2);
   transient_info2->transient_for = xid2;
+  transient_info2->depth = 32;
   AppendAtomToProperty(transient_xid2, kWmStateAtom, kWmStateModalAtom);
   SendInitialEventsForWindow(transient_xid2);
+  Window* transient_win2 = wm_->GetWindowOrDie(transient_xid2);
+
+  // The second window shouldn't get a shadow since it's 32-bit.
+  EXPECT_TRUE(transient_win2->shadow() == NULL);
 
   // We should focus |transient_xid2| and switch to |xid2|.
   EXPECT_EQ(transient_xid2, xconn_->focused_xid());
   EXPECT_EQ(xconn_->root_bounds(), xconn_->GetWindowInfoOrDie(xid2)->bounds);
   EXPECT_EQ(xconn_->root_bounds(), GetCompositedWindowBounds(xid2));
-  EXPECT_EQ(Window::VISIBILITY_HIDDEN,
-            wm_->GetWindowOrDie(transient_xid)->visibility());
-  EXPECT_EQ(Window::VISIBILITY_SHOWN,
-            wm_->GetWindowOrDie(transient_xid2)->visibility());
+  EXPECT_EQ(Window::VISIBILITY_HIDDEN, transient_win->visibility());
+  EXPECT_EQ(Window::VISIBILITY_SHOWN, transient_win2->visibility());
 
   // Create another (non-modal) transient window for |xid2| and check that
   // |transient_xid2| remains focused (since it's modal) and is stacked on top
@@ -349,16 +355,12 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
                        xconn_->GetAtomOrDie("WM_PROTOCOLS"),
                        xconn_->GetAtomOrDie("WM_DELETE_WINDOW"));
   SendInitialEventsForWindow(transient_xid3);
+  Window* transient_win3 = wm_->GetWindowOrDie(transient_xid3);
   EXPECT_EQ(transient_xid2, xconn_->focused_xid());
-  EXPECT_TRUE(
-      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid2),
-                                   wm_->GetWindowOrDie(transient_xid3)));
-  EXPECT_EQ(Window::VISIBILITY_HIDDEN,
-            wm_->GetWindowOrDie(transient_xid)->visibility());
-  EXPECT_EQ(Window::VISIBILITY_SHOWN,
-            wm_->GetWindowOrDie(transient_xid2)->visibility());
-  EXPECT_EQ(Window::VISIBILITY_SHOWN,
-            wm_->GetWindowOrDie(transient_xid3)->visibility());
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(transient_win2, transient_win3));
+  EXPECT_EQ(Window::VISIBILITY_HIDDEN, transient_win->visibility());
+  EXPECT_EQ(Window::VISIBILITY_SHOWN, transient_win2->visibility());
+  EXPECT_EQ(Window::VISIBILITY_SHOWN, transient_win3->visibility());
 
   // We should also ignore _NET_ACTIVE_WINDOW messages about |transient_xid|
   // (again, since |transient_xid2| is modal).
@@ -386,24 +388,18 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
   // http://crosbug.com/17642).
   SendWmStateMessage(transient_xid3, kWmStateModalAtom, true);
   EXPECT_EQ(transient_xid3, xconn_->focused_xid());
-  EXPECT_TRUE(
-      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid3),
-                                   wm_->GetWindowOrDie(transient_xid2)));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(transient_win3, transient_win2));
 
   // Send an event asking for |transient_xid3| to be made non-modal.
   // Since |transient_xid2| is still modal, it should now be focused and on top.
   SendWmStateMessage(transient_xid3, kWmStateModalAtom, false);
   EXPECT_EQ(transient_xid2, xconn_->focused_xid());
-  EXPECT_TRUE(
-      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid2),
-                                   wm_->GetWindowOrDie(transient_xid3)));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(transient_win2, transient_win3));
 
   // Now make |transient_xid2| non-modal as well.
   SendWmStateMessage(transient_xid2, kWmStateModalAtom, false);
   EXPECT_EQ(transient_xid2, xconn_->focused_xid());
-  EXPECT_TRUE(
-      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid2),
-                                   wm_->GetWindowOrDie(transient_xid3)));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(transient_win2, transient_win3));
 
   // Click on |xid2| and check that it takes the focus.
   xconn_->set_pointer_grab_xid(xid2);
@@ -419,9 +415,7 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
   wm_->HandleEvent(&event);
   EXPECT_EQ(0, xconn_->pointer_grab_xid());
   EXPECT_EQ(transient_xid3, xconn_->focused_xid());
-  EXPECT_TRUE(
-      TestWindowIsAboveOtherWindow(wm_->GetWindowOrDie(transient_xid3),
-                                   wm_->GetWindowOrDie(transient_xid2)));
+  EXPECT_TRUE(TestWindowIsAboveOtherWindow(transient_win3, transient_win2));
 
   // Send a message asking for |transient_xid| to be made modal.
   // We should focus it and automatically switch to |xid|.
@@ -429,12 +423,9 @@ TEST_F(LayoutManager2Test, LegacyTransients) {
   EXPECT_EQ(transient_xid, xconn_->focused_xid());
   EXPECT_EQ(xconn_->root_bounds(), xconn_->GetWindowInfoOrDie(xid)->bounds);
   EXPECT_EQ(xconn_->root_bounds(), GetCompositedWindowBounds(xid));
-  EXPECT_EQ(Window::VISIBILITY_SHOWN,
-            wm_->GetWindowOrDie(transient_xid)->visibility());
-  EXPECT_EQ(Window::VISIBILITY_HIDDEN,
-            wm_->GetWindowOrDie(transient_xid2)->visibility());
-  EXPECT_EQ(Window::VISIBILITY_HIDDEN,
-            wm_->GetWindowOrDie(transient_xid3)->visibility());
+  EXPECT_EQ(Window::VISIBILITY_SHOWN, transient_win->visibility());
+  EXPECT_EQ(Window::VISIBILITY_HIDDEN, transient_win2->visibility());
+  EXPECT_EQ(Window::VISIBILITY_HIDDEN, transient_win3->visibility());
 
   // Unmap |transient_xid| and check that |xid| gets the focus.
   xconn_->InitUnmapEvent(&event, transient_xid);

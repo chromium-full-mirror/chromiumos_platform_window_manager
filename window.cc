@@ -111,7 +111,8 @@ Window::Window(WindowManager* wm,
   DCHECK(xid_);
   DLOG(INFO) << "Constructing object to track "
              << (override_redirect_ ? "override-redirect " : "")
-             << "window " << xid_str_ << " at " << geometry.bounds;
+             << "window " << xid_str_ << " at " << geometry.bounds
+             << " with depth " << client_depth_;
 
   // Listen for property and shape changes on this window.
   wm_->xconn()->SelectInputOnWindow(xid_, PropertyChangeMask, true);
@@ -237,13 +238,13 @@ bool Window::FetchAndApplyWindowType() {
 
 void Window::FetchAndApplyWindowOpacity() {
   DCHECK(xid_);
-  static const uint32 kMaxOpacity = 0xffffffffU;
+  static const uint32_t kMaxOpacity = 0xffffffffU;
 
-  uint32 opacity = kMaxOpacity;
+  uint32_t opacity = kMaxOpacity;
   wm_->xconn()->GetIntProperty(
       xid_,
       wm_->GetXAtom(ATOM_NET_WM_WINDOW_OPACITY),
-      reinterpret_cast<int32*>(&opacity));
+      reinterpret_cast<int32_t*>(&opacity));
   client_opacity_ = (opacity == kMaxOpacity) ?
       1.0 : static_cast<double>(opacity) / kMaxOpacity;
 
