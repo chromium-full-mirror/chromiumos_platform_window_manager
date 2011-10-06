@@ -1,8 +1,15 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "window_manager/compositor/gl/mock_gl_interface.h"
+
+#include <utility>
+
+#include "base/logging.h"
+
+using std::make_pair;
+using std::map;
 
 struct __GLinterface;
 struct __GLcontextModes;
@@ -94,6 +101,7 @@ MockGLInterface::MockGLInterface()
       clear_blue_(0.f),
       clear_alpha_(0.f),
       next_glx_pixmap_id_(1),
+      next_texture_id_(1),
       full_updates_count_(0),
       partial_updates_count_(0),
       partial_updates_region_() {
@@ -167,8 +175,25 @@ int MockGLInterface::GetGlxFbConfigAttrib(GLXFBConfig config,
   return Success;
 }
 
+void MockGLInterface::BindGlxTexImage(GLXDrawable drawable,
+                                      int buffer,
+                                      int* attrib_list) {
+  CHECK(drawable < next_glx_pixmap_id_);
+  map<GLXPixmap, int>::iterator it = num_glx_pixmap_bindings_.find(drawable);
+  if (it != num_glx_pixmap_bindings_.end())
+    it->second++;
+  else
+    num_glx_pixmap_bindings_.insert(make_pair(drawable, 1));
+}
+
 void MockGLInterface::Viewport(GLint x, GLint y,
                                GLsizei width, GLsizei height) {
   viewport_.reset(x, y, width, height);
 }
+
+void MockGLInterface::GenTextures(GLsizei n, GLuint* textures) {
+  for (GLsizei i = 0; i < n; ++i)
+    textures[i] = next_texture_id_++;
+}
+
 }  // namespace window_manager

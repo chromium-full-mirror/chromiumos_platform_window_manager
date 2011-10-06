@@ -1,9 +1,11 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #ifndef WINDOW_MANAGER_COMPOSITOR_GL_MOCK_GL_INTERFACE_H_
 #define WINDOW_MANAGER_COMPOSITOR_GL_MOCK_GL_INTERFACE_H_
+
+#include <map>
 
 #include "base/memory/scoped_ptr.h"
 #include "window_manager/compositor/gl/gl_interface.h"
@@ -39,7 +41,7 @@ class MockGLInterface : public GLInterface {
                            int* value);
   virtual void BindGlxTexImage(GLXDrawable drawable,
                                int buffer,
-                               int* attrib_list) {}
+                               int* attrib_list);
   virtual void ReleaseGlxTexImage(GLXDrawable drawable, int buffer) {}
   virtual bool IsCapableOfPartialUpdates() { return true; }
   virtual void CopyGlxSubBuffer(GLXDrawable drawable,
@@ -78,7 +80,7 @@ class MockGLInterface : public GLInterface {
   virtual void EnableClientState(GLenum cap) {}
   virtual void Finish() {}
   virtual void GenBuffers(GLsizei n, GLuint* buffers) {}
-  virtual void GenTextures(GLsizei n, GLuint* textures) {}
+  virtual void GenTextures(GLsizei n, GLuint* textures);
   virtual GLenum GetError() { return GL_NO_ERROR; }
   virtual void LoadIdentity() {}
   virtual void LoadMatrixf(const GLfloat* m) {}
@@ -122,6 +124,11 @@ class MockGLInterface : public GLInterface {
   int full_updates_count() const { return full_updates_count_; }
   int partial_updates_count() const { return partial_updates_count_; }
   const Rect& partial_updates_region() const { return partial_updates_region_; }
+  int get_num_bindings_for_glx_pixmap(GLXPixmap glx_pixmap) const {
+    std::map<GLXPixmap, int>::const_iterator it =
+        num_glx_pixmap_bindings_.find(glx_pixmap);
+    return it != num_glx_pixmap_bindings_.end() ? it->second : 0;
+  }
   // End test-only methods.
 
  private:
@@ -138,6 +145,9 @@ class MockGLInterface : public GLInterface {
   // Next ID to hand out in CreateGlxPixmap().
   GLXPixmap next_glx_pixmap_id_;
 
+  // Next ID to hand out in GenTextures().
+  GLuint next_texture_id_;
+
   // The number of times SwapGlxBuffers() is called.
   int full_updates_count_;
 
@@ -146,6 +156,10 @@ class MockGLInterface : public GLInterface {
 
   // Most recent CopyGlxSubBuffer() region.
   Rect partial_updates_region_;
+
+  // Map from a GLXPixmap's ID to the number of times that it's been passed to
+  // BindGlxTexImage().
+  std::map<GLXPixmap, int> num_glx_pixmap_bindings_;
 
   DISALLOW_COPY_AND_ASSIGN(MockGLInterface);
 };

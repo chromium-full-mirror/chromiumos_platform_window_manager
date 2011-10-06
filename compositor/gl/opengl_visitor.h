@@ -1,4 +1,4 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,6 +6,7 @@
 #define WINDOW_MANAGER_COMPOSITOR_GL_OPENGL_VISITOR_H_
 
 #include <GL/glx.h>
+#include <gtest/gtest_prod.h>  // for FRIEND_TEST() macro
 
 #include <vector>
 
@@ -40,6 +41,7 @@ class OpenGlPixmapData : public TextureData {
 
   // Begin TextureData methods.
   virtual void Refresh();
+  virtual void PrepareForUse();
   // End TextureData methods.
 
   // Initialize our texture and make it contain the current contents of the
@@ -48,6 +50,8 @@ class OpenGlPixmapData : public TextureData {
   bool Init(RealCompositor::TexturePixmapActor* actor);
 
  private:
+  FRIEND_TEST(OpenGlVisitorTest, OnlyRefreshTextureOncePerFrame);
+
   // Fetch the contents of |pixmap_| from the X server and copy them to our
   // texture.  This is the slower implementation used when the
   // texture-from-pixmap extension is unavailable.  Returns true on success.
@@ -66,6 +70,10 @@ class OpenGlPixmapData : public TextureData {
   // Dimensions and depth of |pixmap_|.  This is only initialized if
   // |glx_pixmap_| isn't being used.
   XConnection::WindowGeometry pixmap_geometry_;
+
+  // Does |pixmap_| have pending changes that we need to apply before the next
+  // frame?
+  bool needs_refresh_;
 };
 
 // This class visits an actor tree and draws it using OpenGL.

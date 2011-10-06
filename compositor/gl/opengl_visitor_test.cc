@@ -1,4 +1,4 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -69,6 +69,43 @@ TEST_F(OpenGlVisitorTest, StageColor) {
   EXPECT_FLOAT_EQ(new_green, gl_->clear_green());
   EXPECT_FLOAT_EQ(new_blue, gl_->clear_blue());
   EXPECT_FLOAT_EQ(1.f, gl_->clear_alpha());
+}
+
+// Check that we don't refresh a TexturePixmapActor's texture more than once per
+// frame.  See http://crosbug.com/20971.
+TEST_F(OpenGlVisitorTest, OnlyRefreshTextureOncePerFrame) {
+  RealCompositor::StageActor* stage = compositor_->GetDefaultStage();
+
+  XWindow xid = xconn_->CreateWindow(
+      xconn_->GetRootWindow(),  // parent
+      Rect(0, 0, 400, 300),
+      false,  // override_redirect=false
+      false,  // input_only=false
+      0, 0);  // event_mask, visual
+  XID pixmap_id = xconn_->GetCompositingPixmapForWindow(xid);
+  scoped_ptr<RealCompositor::TexturePixmapActor> actor(
+      compositor_->CreateTexturePixmap());
+  stage->AddActor(actor.get());
+  actor->SetPixmap(pixmap_id);
+
+  // After drawing once, we should've updated the texture from the GLX pixmap
+  // once.
+  OpenGlDrawVisitor visitor(gl_.get(), compositor_.get(), stage);
+  stage->Accept(&visitor);
+  OpenGlPixmapData* pixmap_data =
+      dynamic_cast<OpenGlPixmapData*>(actor->texture_data());
+  CHECK(pixmap_data);
+  GLXPixmap glx_pixmap = pixmap_data->glx_pixmap_;
+  EXPECT_EQ(1, gl_->get_num_bindings_for_glx_pixmap(glx_pixmap));
+
+  // If we tell the actor to update the texture multiple times, it should defer
+  // actually doing the update until we draw again.
+  actor->UpdateTexture();
+  actor->UpdateTexture();
+  actor->UpdateTexture();
+  EXPECT_EQ(1, gl_->get_num_bindings_for_glx_pixmap(glx_pixmap));
+  stage->Accept(&visitor);
+  EXPECT_EQ(2, gl_->get_num_bindings_for_glx_pixmap(glx_pixmap));
 }
 
 }  // end namespace window_manager

@@ -1,4 +1,4 @@
-// Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -53,7 +53,8 @@ OpenGlPixmapData::OpenGlPixmapData(OpenGlDrawVisitor* visitor)
     : visitor_(visitor),
       gl_(visitor_->gl_interface_),
       pixmap_(0),
-      glx_pixmap_(0) {
+      glx_pixmap_(0),
+      needs_refresh_(false) {
   DCHECK(visitor);
 }
 
@@ -70,6 +71,16 @@ OpenGlPixmapData::~OpenGlPixmapData() {
 }
 
 void OpenGlPixmapData::Refresh() {
+  // We wait to update the texture until we're drawing the next frame to avoid
+  // doing multiple updates in a single frame on slower implementations.  See
+  // http://crosbug.com/20971 for details.
+  needs_refresh_ = true;
+}
+
+void OpenGlPixmapData::PrepareForUse() {
+  if (!needs_refresh_)
+    return;
+
   DCHECK(texture());
   gl_->BindTexture(GL_TEXTURE_2D, texture());
 
@@ -82,6 +93,7 @@ void OpenGlPixmapData::Refresh() {
   }
 
   CHECK_GL_ERROR(gl_);
+  needs_refresh_ = false;
 }
 
 bool OpenGlPixmapData::Init(RealCompositor::TexturePixmapActor* actor) {
@@ -95,8 +107,8 @@ bool OpenGlPixmapData::Init(RealCompositor::TexturePixmapActor* actor) {
   CHECK(!pixmap_) << "Pixmap data was already initialized";
   pixmap_ = actor->pixmap();
 
-  const bool use_glx_pixmap = gl_->HasTextureFromPixmapExtension();
-  if (use_glx_pixmap) {
+  const bool has_tfp = gl_->HasTextureFromPixmapExtension();
+  if (has_tfp) {
     const int kGlxPixmapAttribs[] = {
       GLX_TEXTURE_FORMAT_EXT,
       actor->pixmap_is_opaque() ?
@@ -134,12 +146,7 @@ bool OpenGlPixmapData::Init(RealCompositor::TexturePixmapActor* actor) {
   gl_->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   gl_->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-  if (use_glx_pixmap) {
-    gl_->BindGlxTexImage(glx_pixmap_, GLX_FRONT_LEFT_EXT, NULL);
-  } else {
-    if (!CopyPixmapImageToTexture())
-      return false;
-  }
+  needs_refresh_ = true;
 
   CHECK_GL_ERROR(gl_);
   set_texture(new_texture);
@@ -663,6 +670,8 @@ void OpenGlDrawVisitor::VisitTexturePixmap(
     data->set_has_alpha(!actor->pixmap_is_opaque());
     actor->set_texture_data(data.release());
   }
+
+  actor->texture_data()->PrepareForUse();
 
   // All texture pixmaps are also QuadActors, and so we let the
   // QuadActor do all the actual drawing.
