@@ -21,6 +21,9 @@
 #error Need COMPOSITOR_OPENGLES defined to compile this file
 #endif
 
+// Turn this on if you want to debug something in this file in depth.
+#undef EXTRA_LOGGING
+
 namespace window_manager {
 
 OpenGlesDrawVisitor::OpenGlesDrawVisitor(Gles2Interface* gl,
@@ -223,6 +226,7 @@ void OpenGlesDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
     }
   }
 
+#ifdef EXTRA_LOGGING
   if (do_partial_update) {
     DLOG(INFO) << "Performing partial screen update: "
                << damaged_region_.x << ", "
@@ -232,6 +236,7 @@ void OpenGlesDrawVisitor::VisitStage(RealCompositor::StageActor* actor) {
   } else {
     DLOG(INFO) << "Performing fullscreen update.";
   }
+#endif
 
   // No need to clear color buffer if something will cover up the screen.
   if (!has_fullscreen_actor_)
@@ -264,7 +269,9 @@ void OpenGlesDrawVisitor::VisitContainer(
   if (!actor->IsVisible())
     return;
 
+#ifdef EXTRA_LOGGING
   LOG(INFO) << "Visit container: " << actor->name();
+#endif
 
   const float original_opacity = ancestor_opacity_;
   ancestor_opacity_ *= actor->opacity();
